@@ -319,6 +319,8 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 - [ ] Gráfico de memória em tempo real (SVG ou `<canvas>` desenhado à mão).
 - [ ] `ViewModelWatcher`: não há como observar o `onCleared` de ViewModels de terceiros. Abordagem do LeakCanary: injetar um ViewModel próprio no `ViewModelStore` de cada Activity/Fragment e, no `onCleared` dele, ler o mapa interno do store por reflection e observar os demais. Mesmo risco de reflection do `ServiceWatcher` — isolar e tornar opcional.
 - [ ] `ServiceWatcher` (avaliar abordagem; pode exigir reflection — documentar riscos).
+- [ ] `FragmentViewWatcher`: observar a view do Fragment no `onDestroyView()` (vazamento comum: binding/view guardado num campo do Fragment).
+- [ ] Detecção sem registro na análise: procurar no heap objetos "obviamente mortos" mesmo que nunca observados (Activity com `mDestroyed`, Fragment desanexado, View desanexada), usando os inspectors do Shark, para que um dump manual também os encontre.
 - [ ] Aplicar em tempo de execução os campos de `LeakWebConfig` ligados a watchers (`retainedThreshold`, `watchers`) via novo `start`.
 
 ### Fase 7 — Robustez
