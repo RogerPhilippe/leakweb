@@ -188,14 +188,19 @@ class LeakWebHttpHandlerTest {
     }
 
     @Test
-    fun `limits the number of event stream clients`() {
+    fun `a new event stream client ends the oldest one when the limit is reached`() {
         val handler = handler()
-        val first = handler.handle(request("/api/events"))
+        val first = (handler.handle(request("/api/events")).body as HttpBody.EventStream).stream
+        val buffer = ByteArray(64)
+        first.read(buffer, 0, buffer.size) // ": connected"
 
-        assertTrue(first.body is HttpBody.EventStream)
-        assertEquals(503, handler.handle(request("/api/events")).status)
-        (first.body as HttpBody.EventStream).stream.close()
-        assertEquals(200, handler.handle(request("/api/events")).status)
+        val second = handler.handle(request("/api/events"))
+
+        assertEquals(200, second.status)
+        assertEquals(-1, first.read(buffer, 0, buffer.size))
+        first.close()
+        (second.body as HttpBody.EventStream).stream.close()
+        assertEquals(0, hub.clientCount)
     }
 
     @Test

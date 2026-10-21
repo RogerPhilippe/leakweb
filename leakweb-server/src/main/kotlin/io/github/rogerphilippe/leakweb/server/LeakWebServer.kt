@@ -11,6 +11,7 @@ import io.github.rogerphilippe.leakweb.server.http.HttpRequest
 import io.github.rogerphilippe.leakweb.server.http.HttpResponse
 import io.github.rogerphilippe.leakweb.server.http.HttpStatus
 import io.github.rogerphilippe.leakweb.server.http.Router
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +19,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.util.logging.Level
+import java.util.logging.Logger
 
 data class ServerConfig(
     /** `127.0.0.1` for loopback only, `0.0.0.0` for every interface. */
@@ -62,7 +65,10 @@ class LeakWebServer(
     @Throws(IOException::class)
     fun start(): Int {
         check(server == null) { "Already started" }
-        val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        // A failure in an event stream must never crash the app that embeds the server.
+        val errorHandler =
+            CoroutineExceptionHandler { _, error -> logger.log(Level.WARNING, "LeakWeb event stream failed", error) }
+        val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + errorHandler)
         val hub = EventStreamHub(events, newScope, config.maxEventClients, config.pingIntervalMillis)
         val candidates =
             if (config.portFallback && config.port != 0) {
@@ -108,6 +114,7 @@ class LeakWebServer(
 
     private companion object {
         const val SOCKET_READ_TIMEOUT_MILLIS = 5_000
+        val logger: Logger = Logger.getLogger(LeakWebServer::class.java.name)
     }
 }
 

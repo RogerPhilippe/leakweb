@@ -69,13 +69,10 @@ internal class ApiRoutes(
         }
         router.get("/api/memory") { jsonResponse(MemorySample.serializer(), commands.memory()) }
         router.get("/api/events") {
-            val stream =
-                eventStreams.open()
-                    ?: return@get errorResponse(HttpStatus.SERVICE_UNAVAILABLE, "Too many event stream clients")
             HttpResponse(
                 status = HttpStatus.OK,
                 contentType = "text/event-stream; charset=utf-8",
-                body = HttpBody.EventStream(stream),
+                body = HttpBody.EventStream(eventStreams.open()),
                 headers = mapOf("Cache-Control" to "no-cache", "X-Accel-Buffering" to "no"),
             )
         }

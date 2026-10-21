@@ -303,14 +303,14 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** testes unitários do `Router` e das rotas (sem socket) + testes de integração subindo o servidor em porta aleatória na JVM (incluindo leitura de SSE com `Accept-Encoding: gzip`, desconexão e liberação da thread); `curl` funcionando no `sample`.
 
 ### Fase 5 — Interface web (MVP)
-- [ ] `resources/leakweb/web/index.html`, `app.js` (ES module), `styles.css`. Sem frameworks.
-- [ ] Todo texto vindo do heap (nomes de classe, campos, valores) renderizado com `textContent`, nunca `innerHTML` — evita XSS por strings do app.
-- [ ] Layout: barra lateral (Vazamentos, Retidos, Memória, Análises) + área principal.
-- [ ] Lista de vazamentos com busca e ordenação por retained size.
-- [ ] Tela de detalhe do trace: cadeia vertical GC root → objeto vazado, destacando referências suspeitas, status e motivo de cada nó.
-- [ ] Indicador ao vivo via `EventSource` (objetos retidos, progresso de análise, toast de novo vazamento).
-- [ ] Botões: forçar GC, dump manual, baixar `.hprof`, apagar análise.
-- [ ] Tema claro/escuro com `light-dark()` e responsivo.
+- [x] `resources/leakweb/web/index.html`, `app.js` (ES module), `styles.css`. Sem frameworks.
+- [x] Todo texto vindo do heap (nomes de classe, campos, valores) renderizado com `textContent`, nunca `innerHTML` — evita XSS por strings do app.
+- [x] Layout: barra lateral (Vazamentos, Retidos, Memória, Análises) + área principal.
+- [x] Lista de vazamentos com busca e ordenação por retained size.
+- [x] Tela de detalhe do trace: cadeia vertical GC root → objeto vazado, destacando referências suspeitas, status e motivo de cada nó.
+- [x] Indicador ao vivo via `EventSource` (objetos retidos, progresso de análise, toast de novo vazamento).
+- [x] Botões: forçar GC, dump manual, baixar `.hprof`, apagar análise.
+- [x] Tema claro/escuro com `light-dark()` e responsivo.
 
 **Aceite:** fluxo completo no navegador: provocar vazamento no `sample` → ver progresso → abrir trace → baixar hprof.
 

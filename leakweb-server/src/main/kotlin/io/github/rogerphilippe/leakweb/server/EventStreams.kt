@@ -6,6 +6,7 @@ package io.github.rogerphilippe.leakweb.server
 import io.github.rogerphilippe.leakweb.model.Event
 import io.github.rogerphilippe.leakweb.model.LeakWebJson
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.isActive
@@ -75,25 +76,34 @@ internal class EventStreamInputStream(
     }
 }
 
-/** Fans [events] out to at most [maxClients] SSE clients, with a comment ping so dead clients are noticed. */
+/**
+ * Fans [events] out to at most [maxClients] SSE clients, with a comment ping so dead clients are noticed.
+ * A client that went away keeps its slot until the next ping fails, so when the limit is reached the
+ * oldest stream is ended instead of refusing the new client (usually the tab that was just reloaded).
+ */
 internal class EventStreamHub(
     private val events: Flow<Event>,
     private val scope: CoroutineScope,
     private val maxClients: Int,
     private val pingIntervalMillis: Long,
 ) {
-    private val streams = mutableSetOf<EventStreamInputStream>()
+    // Insertion order: the first one is the oldest.
+    private val streams = linkedSetOf<EventStreamInputStream>()
 
     val clientCount: Int
         @Synchronized get() = streams.size
 
-    /** Null when [maxClients] are already connected. */
     @Synchronized
-    fun open(): EventStreamInputStream? {
-        if (streams.size >= maxClients) return null
+    fun open(): EventStreamInputStream {
+        if (streams.size >= maxClients) {
+            val oldest = streams.first()
+            streams.remove(oldest)
+            oldest.finish()
+        }
         lateinit var stream: EventStreamInputStream
+        // Lazy: the producer must not run before `stream` is assigned.
         val job =
-            scope.launch {
+            scope.launch(start = CoroutineStart.LAZY) {
                 stream.offer(": connected\n\n")
                 launch {
                     while (isActive) {
@@ -109,6 +119,7 @@ internal class EventStreamHub(
                 synchronized(this) { streams.remove(stream) }
             }
         streams += stream
+        job.start()
         return stream
     }
 
