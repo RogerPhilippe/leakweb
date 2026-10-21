@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -22,6 +23,13 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LeakwebApp"
-include(":app")
- 
+rootProject.name = "leakweb"
+include(
+    ":leakweb-api",
+    ":leakweb-model",
+    ":leakweb-analyzer",
+    ":leakweb-server",
+    ":leakweb-android",
+    ":leakweb-noop",
+    ":sample",
+)

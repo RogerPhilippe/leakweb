@@ -1,0 +1,6 @@
+# Overrides on top of the Detekt default configuration (buildUponDefaultConfig = true).
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - 'Composable'

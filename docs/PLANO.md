@@ -241,13 +241,13 @@ Respostas JSON incluem `schemaVersion`; o `LeakStore` grava o mesmo campo no dis
 Cada fase termina com código compilando, testes passando e um commit/PR.
 
 ### Fase 0 — Fundação
-- [ ] Projeto Gradle multi-módulo com version catalog (`libs.versions.toml`) e convention plugins em `build-logic`.
-- [ ] Módulos vazios criados conforme a seção 3 (incluindo `leakweb-api` e `leakweb-noop`).
-- [ ] `sample` dependendo de `leakweb-android` em debug e `leakweb-noop` em release.
-- [ ] Detekt + ktlint (ou Spotless) configurados.
-- [ ] GitHub Actions: build + testes em PR.
-- [ ] `README.md` inicial. **Sem arquivo `LICENSE` por enquanto** (licença em aberto; repositório privado até a decisão).
-- [ ] Cabeçalho de copyright nos arquivos-fonte sem identificador de licença (ex.: `Copyright (c) 2026 Roger Philippe`), para facilitar a aplicação posterior.
+- [x] Projeto Gradle multi-módulo com version catalog (`libs.versions.toml`) e convention plugins em `build-logic`.
+- [x] Módulos vazios criados conforme a seção 3 (incluindo `leakweb-api` e `leakweb-noop`).
+- [x] `sample` dependendo de `leakweb-android` em debug e `leakweb-noop` em release.
+- [x] Detekt + ktlint (ou Spotless) configurados.
+- [x] GitHub Actions: build + testes em PR.
+- [x] `README.md` inicial. **Sem arquivo `LICENSE` por enquanto** (licença em aberto; repositório privado até a decisão).
+- [x] Cabeçalho de copyright nos arquivos-fonte sem identificador de licença (ex.: `Copyright (c) 2026 Roger Philippe`), para facilitar a aplicação posterior.
 
 **Aceite:** `./gradlew build` verde localmente e no CI.
 
