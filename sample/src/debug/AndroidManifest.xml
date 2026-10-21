@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Manual mode: turns off the automatic start so SampleApplication can call LeakWeb.start().
+             MissingClass: androidx.startup comes with leakweb-android but is not on the app classpath. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:ignore="MissingClass"
+            tools:node="merge">
+            <meta-data
+                android:name="io.github.rogerphilippe.leakweb.LeakWebInitializer"
+                tools:node="remove" />
+        </provider>
+    </application>
+
+</manifest>

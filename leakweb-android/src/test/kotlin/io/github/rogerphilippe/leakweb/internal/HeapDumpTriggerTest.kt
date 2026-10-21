@@ -108,6 +108,29 @@ class HeapDumpTriggerTest {
     }
 
     @Test
+    fun `manual dump ignores the threshold and the wait between dumps`() {
+        retain(3)
+        trigger.onObjectRetained()
+        runScheduled()
+
+        assertTrue(trigger.requestManualDump())
+        runScheduled()
+
+        assertEquals(2, heapDumps.size)
+    }
+
+    @Test
+    fun `a pending manual dump is not requested twice`() {
+        assertTrue(trigger.requestManualDump())
+        assertFalse(trigger.requestManualDump())
+
+        runScheduled()
+
+        assertEquals(1, heapDumps.size)
+        assertTrue(trigger.requestManualDump())
+    }
+
+    @Test
     fun `checks requested before the scheduled one runs are merged`() {
         retain(3)
 

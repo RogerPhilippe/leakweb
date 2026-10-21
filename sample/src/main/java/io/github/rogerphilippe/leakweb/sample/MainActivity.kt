@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
             LeakwebAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     LeakScenarios(
+                        serverUrl = LeakWeb.session.url,
                         onOpenLeakingActivity = { startActivity(Intent(this, LeakingActivity::class.java)) },
                         onLeakWatchedObject = ::leakWatchedObject,
                         modifier = Modifier.padding(innerPadding),
@@ -53,6 +54,7 @@ class LeakedObject
 
 @Composable
 fun LeakScenarios(
+    serverUrl: String,
     onOpenLeakingActivity: () -> Unit,
     onLeakWatchedObject: () -> Unit,
     modifier: Modifier = Modifier,
@@ -63,6 +65,7 @@ fun LeakScenarios(
     ) {
         Text("LeakWeb sample", style = MaterialTheme.typography.headlineSmall)
         Text("Each scenario leaks on purpose. Retained objects are logged ~5 s later (logcat tag LeakWeb).")
+        Text(if (serverUrl.isEmpty()) "LeakWeb server not running" else "LeakWeb: $serverUrl")
         Button(onClick = onOpenLeakingActivity) {
             Text("Open an activity that leaks (then press back)")
         }
@@ -76,6 +79,10 @@ fun LeakScenarios(
 @Composable
 fun LeakScenariosPreview() {
     LeakwebAppTheme {
-        LeakScenarios(onOpenLeakingActivity = {}, onLeakWatchedObject = {})
+        LeakScenarios(
+            serverUrl = "http://localhost:9090/?token=abc",
+            onOpenLeakingActivity = {},
+            onLeakWatchedObject = {},
+        )
     }
 }

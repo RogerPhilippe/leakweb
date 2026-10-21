@@ -283,22 +283,22 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** vazamento do `sample` gera dump, análise e registro no store, sem intervenção manual.
 
 ### Fase 4 — Servidor
-- [ ] `LeakWebServer` (subclasse de `NanoHTTPD`) em `leakweb-server` recebendo interfaces (`LeakStoreReader`, `Commands`, `Flow<Event>`) — sem dependência de Android.
-- [ ] `Router` próprio: registro por método + padrão (`/api/leaks/{signature}`), extração de parâmetros, 404/405, tratamento de exceção → 500 em JSON.
-- [ ] Rotas da seção 5, JSON com kotlinx.serialization.
-- [ ] SSE com `EventStreamInputStream` + resposta chunked, sem gzip (ver seção 4).
-- [ ] Servir arquivos estáticos do classpath com MIME correto.
-- [ ] Bind em `127.0.0.1` por padrão, porta configurável com fallback se ocupada.
-- [ ] Autenticação por token em todas as rotas, com troca por cookie (nome com a porta) na primeira visita (seção 4.1).
-- [ ] Validação do header `Host` (`localhost`/`127.0.0.1`/IP do bind) contra DNS rebinding, e do `Origin` em POST/DELETE; validação de formato de `{id}`/`{signature}` (seção 5).
-- [ ] Header `Content-Security-Policy` restritivo (`default-src 'self'`) nas respostas HTML.
-- [ ] API pública `LeakWeb.start(application, config): LeakWebSession`, `stop()` e `session`, com `start` idempotente.
-- [ ] `LeakWebConfig` e `LeakWebSession` em `leakweb-api`, conforme a seção 4.1.
-- [ ] `leakweb-noop` com o mesmo `object LeakWeb` (sessão vazia), já nesta fase — o `sample` em release passa a usar a API real.
-- [ ] Wiring em `leakweb-android` + `LeakWebInitializer` (`androidx.startup`) chamando `start` com config padrão.
-- [ ] Modo manual documentado (remoção do initializer no manifest) e demonstrado no `sample` com porta diferente de 8080.
-- [ ] README com instruções dos dois modos: automático (padrão, porta 8080, URL com token no logcat, `adb forward`) e manual (remoção do initializer no manifest + `LeakWeb.start(application, config)` no `Application`, acesso ao token/porta pela `LeakWebSession`).
-- [ ] Logcat ao iniciar (se `logStartup`): URL completa com token + comando `adb forward`; com `BindAddress.AllInterfaces`, também a URL com o IP da rede local.
+- [x] `LeakWebServer` (subclasse de `NanoHTTPD`) em `leakweb-server` recebendo interfaces (`LeakStoreReader`, `Commands`, `Flow<Event>`) — sem dependência de Android.
+- [x] `Router` próprio: registro por método + padrão (`/api/leaks/{signature}`), extração de parâmetros, 404/405, tratamento de exceção → 500 em JSON.
+- [x] Rotas da seção 5, JSON com kotlinx.serialization.
+- [x] SSE com `EventStreamInputStream` + resposta chunked, sem gzip (ver seção 4).
+- [x] Servir arquivos estáticos do classpath com MIME correto.
+- [x] Bind em `127.0.0.1` por padrão, porta configurável com fallback se ocupada.
+- [x] Autenticação por token em todas as rotas, com troca por cookie (nome com a porta) na primeira visita (seção 4.1).
+- [x] Validação do header `Host` (`localhost`/`127.0.0.1`/IP do bind) contra DNS rebinding, e do `Origin` em POST/DELETE; validação de formato de `{id}`/`{signature}` (seção 5).
+- [x] Header `Content-Security-Policy` restritivo (`default-src 'self'`) nas respostas HTML.
+- [x] API pública `LeakWeb.start(application, config): LeakWebSession`, `stop()` e `session`, com `start` idempotente.
+- [x] `LeakWebConfig` e `LeakWebSession` em `leakweb-api`, conforme a seção 4.1.
+- [x] `leakweb-noop` com o mesmo `object LeakWeb` (sessão vazia), já nesta fase — o `sample` em release passa a usar a API real.
+- [x] Wiring em `leakweb-android` + `LeakWebInitializer` (`androidx.startup`) chamando `start` com config padrão.
+- [x] Modo manual documentado (remoção do initializer no manifest) e demonstrado no `sample` com porta diferente de 8080.
+- [x] README com instruções dos dois modos: automático (padrão, porta 8080, URL com token no logcat, `adb forward`) e manual (remoção do initializer no manifest + `LeakWeb.start(application, config)` no `Application`, acesso ao token/porta pela `LeakWebSession`).
+- [x] Logcat ao iniciar (se `logStartup`): URL completa com token + comando `adb forward`; com `BindAddress.AllInterfaces`, também a URL com o IP da rede local.
 
 **Aceite:** testes unitários do `Router` e das rotas (sem socket) + testes de integração subindo o servidor em porta aleatória na JVM (incluindo leitura de SSE com `Accept-Encoding: gzip`, desconexão e liberação da thread); `curl` funcionando no `sample`.
 

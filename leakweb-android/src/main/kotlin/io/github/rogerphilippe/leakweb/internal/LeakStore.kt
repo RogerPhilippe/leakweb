@@ -10,6 +10,7 @@ import io.github.rogerphilippe.leakweb.model.LeakDetails
 import io.github.rogerphilippe.leakweb.model.LeakSummary
 import io.github.rogerphilippe.leakweb.model.LeakWebJson
 import io.github.rogerphilippe.leakweb.model.StoredAnalysis
+import io.github.rogerphilippe.leakweb.server.LeakStoreReader
 import kotlinx.serialization.SerializationException
 import java.io.File
 import java.io.IOException
@@ -24,7 +25,7 @@ import java.io.IOException
 internal class LeakStore(
     directory: File,
     private val maxHeapDumps: Int = DEFAULT_MAX_HEAP_DUMPS,
-) {
+) : LeakStoreReader {
     private val analysesDir = File(directory, "analyses")
     private val dumpsDir = File(directory, "dumps")
 
@@ -50,17 +51,17 @@ internal class LeakStore(
 
     /** All analyses, most recent first. Unreadable files are skipped. */
     @Synchronized
-    fun analyses(): List<HeapAnalysis> =
+    override fun analyses(): List<HeapAnalysis> =
         analysesDir
             .listFiles { file -> file.name.endsWith(".json") }
             .orEmpty()
             .mapNotNull { it.readAnalysis() }
             .sortedByDescending { it.createdAtMillis }
 
-    fun analysis(id: String): HeapAnalysis? = analyses().firstOrNull { it.id == id }
+    override fun analysis(id: String): HeapAnalysis? = analyses().firstOrNull { it.id == id }
 
     /** Heap dump of analysis [id], or null if unknown or already pruned. */
-    fun heapDumpFile(id: String): File? {
+    override fun heapDumpFile(id: String): File? {
         val analysis = analysis(id) ?: return null
         return File(dumpsDir, analysis.heapDumpFileName).takeIf { it.isFile && it.parentFile == dumpsDir }
     }
@@ -74,9 +75,9 @@ internal class LeakStore(
     }
 
     /** Leaks grouped by signature, most recently seen first. */
-    fun leaks(): List<LeakSummary> = leakDetails().map { it.summary }
+    override fun leaks(): List<LeakSummary> = leakDetails().map { it.summary }
 
-    fun leak(signature: String): LeakDetails? = leakDetails().firstOrNull { it.summary.signature == signature }
+    override fun leak(signature: String): LeakDetails? = leakDetails().firstOrNull { it.summary.signature == signature }
 
     private fun leakDetails(): List<LeakDetails> {
         // Analyses are most recent first, so the first occurrence of each signature is the latest one.

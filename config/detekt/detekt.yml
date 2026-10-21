@@ -4,3 +4,9 @@ naming:
   FunctionNaming:
     ignoreAnnotated:
       - 'Composable'
+
+style:
+  # Early returns for invalid input (guard clauses) keep request handling flat.
+  ReturnCount:
+    max: 3
+    excludeGuardClauses: true

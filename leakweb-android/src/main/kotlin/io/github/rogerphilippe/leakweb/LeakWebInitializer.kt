@@ -10,7 +10,7 @@ import androidx.startup.Initializer
 /** Starts LeakWeb automatically when the app starts (androidx.startup). */
 class LeakWebInitializer : Initializer<Unit> {
     override fun create(context: Context) {
-        LeakWeb.install(context.applicationContext as Application)
+        LeakWeb.start(context.applicationContext as Application)
     }
 
     override fun dependencies(): List<Class<out Initializer<*>>> = emptyList()

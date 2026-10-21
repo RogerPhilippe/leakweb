@@ -44,6 +44,118 @@ dependencies {
 
 Never ship `leakweb-android` in a release build: heap dumps expose everything that is in memory.
 
+## Usage
+
+LeakWeb can start by itself (automatic mode, the default) or be started from your code (manual mode).
+Either way, the web server listens on the device; you reach it from the computer through `adb forward`,
+and every request needs the session token.
+
+### Automatic mode (default)
+
+Add the dependency and run the debug build: nothing else to do. LeakWeb starts with the app
+(through `androidx.startup`), watches destroyed activities and fragments, and starts the web server on
+port **8080** (or the next free port). The URL with the token is printed in logcat, tag `LeakWeb`:
+
+```
+LeakWeb server running on port 8080. On the computer, run:
+  adb forward tcp:8080 tcp:8080
+then open http://localhost:8080/?token=Zm9vYmFyYmF6cXV4ZXhhbXBsZXRva2VuLWZvci1kb2Nz
+```
+
+Run the `adb forward` command and open the URL in the desktop browser. The first visit exchanges the
+token for a session cookie, so later visits to `http://localhost:8080/` need no token. A new token is
+generated each time the app starts.
+
+### Manual mode
+
+Use it to choose the port, keep the same token across restarts, listen on the local network or start
+LeakWeb only when you want to. It needs `leakweb-noop` in release builds (see above).
+
+1. Turn off the automatic start in the app manifest. Put it in `src/debug/AndroidManifest.xml`,
+   since `leakweb-android` only exists in debug builds:
+
+   ```xml
+   <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+       xmlns:tools="http://schemas.android.com/tools">
+       <application>
+           <provider
+               android:name="androidx.startup.InitializationProvider"
+               android:authorities="${applicationId}.androidx-startup"
+               tools:ignore="MissingClass"
+               tools:node="merge">
+               <meta-data
+                   android:name="io.github.rogerphilippe.leakweb.LeakWebInitializer"
+                   tools:node="remove" />
+           </provider>
+       </application>
+   </manifest>
+   ```
+
+   The manifest merger removes only the LeakWeb entry; other `androidx.startup` initializers keep
+   working. `tools:ignore="MissingClass"` is there because `androidx.startup` comes with
+   `leakweb-android` and is not on your app's compile classpath, which Android Lint reports.
+
+2. Start LeakWeb in your `Application`:
+
+   ```kotlin
+   class MyApplication : Application() {
+       override fun onCreate() {
+           super.onCreate()
+           val session = LeakWeb.start(this, LeakWebConfig(port = 9090, persistToken = true))
+           // session.port, session.token and session.url, e.g. to show them in a debug screen.
+       }
+   }
+   ```
+
+   In release builds `leakweb-noop` makes `start()` return `LeakWebSession.NOT_RUNNING` and do nothing.
+
+`LeakWebConfig` options:
+
+| Option | Default | Description |
+|---|---|---|
+| `port` | `8080` | Port of the web server |
+| `portFallback` | `true` | Tries the next ports if `port` is in use; the real one is `session.port` |
+| `bindAddress` | `Loopback` | `Loopback` (`127.0.0.1`, through `adb forward`) or `AllInterfaces` (local network too) |
+| `token` | `null` | Fixed token, handy for bookmarks; `null` generates a random one |
+| `persistToken` | `false` | Keeps the generated token across app restarts |
+| `logStartup` | `true` | Logs the URL with the token and the `adb forward` command |
+| `retainedThreshold` | `5` | Retained objects needed to dump the heap while the app is visible (1 in background) |
+| `watchers` | Activity, Fragment | What is watched automatically |
+
+Other calls: `LeakWeb.session` returns the running session, `LeakWeb.stop()` stops the web server
+(leaks are still detected), and `start()` again with another config restarts the server. Calling
+`start()` with the same config just returns the current session. `LeakWeb.watch(obj, "reason")`
+watches any object that should be garbage collected soon.
+
+With `BindAddress.AllInterfaces`, logcat also shows the URL with the device IP. Anyone on the network
+who has the token can download heap dumps, so use it only on trusted networks.
+
+### HTTP API
+
+The web UI uses a JSON API that you can also call from scripts. Send the token as
+`Authorization: Bearer <token>` or `X-LeakWeb-Token: <token>`:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/leaks
+```
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/status` | Library version, app, process, port, watched/retained object counts |
+| GET | `/api/leaks` | Leaks grouped by signature |
+| GET | `/api/leaks/{signature}` | Full leak trace and the analyses where it appeared |
+| GET | `/api/analyses` | Analysis history |
+| GET | `/api/analyses/{id}/hprof` | Downloads the heap dump |
+| DELETE | `/api/analyses/{id}` | Deletes an analysis and its heap dump |
+| GET | `/api/retained` | Objects retained right now, not analyzed yet |
+| POST | `/api/heapdump` | Dumps and analyzes the heap now |
+| POST | `/api/gc` | Runs the garbage collector |
+| GET | `/api/memory` | Current memory usage |
+| GET | `/api/events` | Server-Sent Events: retained objects, heap dumps, analysis progress, new leaks |
+
+Responses are wrapped as `{"schemaVersion": 1, "data": ...}`; errors as
+`{"schemaVersion": 1, "error": {"status": 404, "message": "..."}}`.
+
 ## Modules
 
 | Module | Type | Purpose |
@@ -55,7 +167,7 @@ Never ship `leakweb-android` in a release build: heap dumps expose everything th
 | `leakweb-server` | JVM | Embedded HTTP server, REST API, SSE and web frontend |
 | `leakweb-android` | Android | Watchers, heap dumper, store, startup wiring |
 | `leakweb-noop` | Android | Same public API, empty implementation (release) |
-| `sample` | App | App with intentional leaks for testing |
+| `sample` | App | App with intentional leaks for testing; uses the manual mode on port 9090 |
 | `build-logic` | Gradle | Convention plugins |
 
 ## Building

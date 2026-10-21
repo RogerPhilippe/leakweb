@@ -60,6 +60,7 @@ internal class HeapDumpTrigger(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val checkScheduled = AtomicBoolean(false)
+    private val manualDumpPending = AtomicBoolean(false)
 
     @Volatile
     private var lastDumpUptimeMillis: Long? = null
@@ -68,6 +69,19 @@ internal class HeapDumpTrigger(
 
     /** Going to background lowers the threshold, so it can be time to dump. */
     fun onAppVisibilityChanged() = scheduleCheck(0L)
+
+    /** Dumps the heap now, whatever the retained count; false if a requested dump did not start yet. */
+    fun requestManualDump(): Boolean {
+        if (!manualDumpPending.compareAndSet(false, true)) return false
+        executor.schedule(0L) {
+            try {
+                dumpHeap(objectWatcher.retainedObjectCount, "Dumping the heap on request")
+            } finally {
+                manualDumpPending.set(false)
+            }
+        }
+        return true
+    }
 
     private fun scheduleCheck(delayMillis: Long) {
         if (!checkScheduled.compareAndSet(false, true)) return
@@ -88,13 +102,16 @@ internal class HeapDumpTrigger(
             scheduleCheck(waitBetweenDumpsMillis - elapsedMillis)
             return
         }
-        dumpHeap(retainedCount)
+        dumpHeap(retainedCount, "Dumping the heap ($retainedCount retained objects)")
     }
 
-    private fun dumpHeap(retainedCount: Int) {
+    private fun dumpHeap(
+        retainedCount: Int,
+        reason: String,
+    ) {
         val id = newId()
         val file = store.newHeapDumpFile(id)
-        val message = "Dumping the heap ($retainedCount retained objects), the app will freeze for a moment"
+        val message = "$reason, the app will freeze for a moment"
         Log.w(LEAKWEB_TAG, message)
         notifyUser("LeakWeb: $message")
         eventBus.post(Event.HeapDumpStarted(retainedCount))

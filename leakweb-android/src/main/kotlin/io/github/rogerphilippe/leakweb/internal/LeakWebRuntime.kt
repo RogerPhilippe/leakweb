@@ -9,6 +9,8 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
+import io.github.rogerphilippe.leakweb.LeakWebConfig
+import io.github.rogerphilippe.leakweb.WatcherType
 import io.github.rogerphilippe.leakweb.analyzer.HprofAnalyzer
 import io.github.rogerphilippe.leakweb.model.Event
 import io.github.rogerphilippe.leakweb.watcher.Clock
@@ -30,12 +32,16 @@ internal class LeakWebRuntime private constructor(
     val objectWatcher: ObjectWatcher,
     val store: LeakStore,
     val eventBus: EventBus,
+    val heapDumpTrigger: HeapDumpTrigger,
 ) {
     companion object {
         /** Delay before checking if a watched object was garbage collected. */
         private const val RETAINED_DELAY_SECONDS = 5L
 
-        fun install(application: Application): LeakWebRuntime {
+        fun install(
+            application: Application,
+            config: LeakWebConfig,
+        ): LeakWebRuntime {
             val clock = Clock { SystemClock.uptimeMillis() }
             // Checks run off the main thread because they trigger a (blocking) GC.
             val watcherThread = singleThreadScheduler("LeakWeb-watcher")
@@ -73,6 +79,7 @@ internal class LeakWebRuntime private constructor(
                     store = store,
                     eventBus = eventBus,
                     onHeapDumped = { analysisRunner.analyze(it) },
+                    visibleThreshold = config.retainedThreshold,
                     notifyUser = { message ->
                         mainHandler.post { Toast.makeText(application, message, Toast.LENGTH_LONG).show() }
                     },
@@ -92,9 +99,21 @@ internal class LeakWebRuntime private constructor(
                 heapDumpTrigger.onObjectRetained()
             }
             application.registerActivityLifecycleCallbacks(visibilityTracker)
-            application.registerActivityLifecycleCallbacks(ActivityWatcher(objectWatcher))
-            installFragmentWatcherIfAvailable(application, objectWatcher)
-            return LeakWebRuntime(objectWatcher, store, eventBus)
+            installWatchers(application, objectWatcher, config.watchers)
+            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger)
+        }
+
+        private fun installWatchers(
+            application: Application,
+            objectWatcher: ObjectWatcher,
+            watchers: Set<WatcherType>,
+        ) {
+            if (WatcherType.ACTIVITY in watchers) {
+                application.registerActivityLifecycleCallbacks(ActivityWatcher(objectWatcher))
+            }
+            if (WatcherType.FRAGMENT in watchers) {
+                installFragmentWatcherIfAvailable(application, objectWatcher)
+            }
         }
 
         private fun singleThreadScheduler(name: String): ScheduledExecutorService =
