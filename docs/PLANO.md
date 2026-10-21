@@ -22,7 +22,7 @@ Biblioteca Android (Kotlin) open source para **detectar vazamentos de memória**
 - Suporte a Kotlin Multiplatform ou iOS.
 - Detecção em produção / envio de relatórios para servidor remoto.
 
-### 1.1 Posicionamento vs LeakCanary (decisão em aberto)
+### 1.1 Posicionamento vs LeakCanary (decidido: opção A)
 
 O LeakCanary (Apache 2.0) já detecta vazamentos e tem UI no aparelho. O diferencial do LeakWeb é a **interface web**, a **memória ao vivo** e o **download do `.hprof`** — não a detecção em si. Decidir antes da Fase 2:
 
@@ -34,7 +34,7 @@ O LeakCanary (Apache 2.0) já detecta vazamentos e tem UI no aparelho. O diferen
 
 Se código do LeakCanary for copiado/adaptado, manter o aviso de copyright e o `NOTICE` da Apache 2.0.
 
-O restante do plano assume a **opção A**; os itens marcados com *(A)* somem nas opções B/C.
+**Decisão: opção A** (issue #10). `ViewModelWatcher` e `ServiceWatcher` (Fase 6, reflection) podem ser adaptados do LeakCanary, preservando o aviso de copyright e o `NOTICE`. Um adaptador opcional para `LeakCanary.config.eventListeners` (opção C como funcionalidade extra) fica para o futuro.
 
 ---
 
@@ -66,6 +66,7 @@ O restante do plano assume a **opção A**; os itens marcados com *(A)* somem na
 leakweb/
 ├─ leakweb-api/         (JVM)     Tipos públicos compartilhados por android e noop: LeakWebConfig, LeakWebSession, BindAddress, WatcherType
 ├─ leakweb-model/       (JVM)     Modelos serializáveis: Leak, LeakTrace, HeapAnalysis, MemorySample, Event
+├─ leakweb-watcher/     (JVM)     KeyedWeakReference e (Fase 2) ObjectWatcher com Clock/GcTrigger injetáveis
 ├─ leakweb-analyzer/    (JVM)     Wrapper do Shark: hprof → HeapAnalysis (modelo próprio)
 ├─ leakweb-server/      (JVM)     NanoHTTPD: router, rotas REST, SSE, arquivos estáticos (frontend em resources/leakweb/web)
 ├─ leakweb-android/     (Android) Watcher, installers de ciclo de vida, heap dumper, store, startup, wiring
@@ -77,6 +78,8 @@ leakweb/
 Regra: tudo que **não depende de Android** fica em módulo JVM, para ser testado com JUnit puro e rápido.
 
 `leakweb-android` e `leakweb-noop` expõem `api(project(":leakweb-api"))`; só o `object LeakWeb` é duplicado entre os dois, evitando divergência dos tipos de configuração.
+
+O usuário da lib declara só `leakweb-android` (debug) e, opcionalmente, `leakweb-noop` (release); os demais módulos vêm como dependências transitivas.
 
 ---
 
@@ -115,8 +118,8 @@ Regra: tudo que **não depende de Android** fica em módulo JVM, para ser testad
 - **ObjectWatcher**: `watch(obj, description)` cria `KeyedWeakReference(obj, key = UUID, description, watchUptimeMillis, queue)`. Após ~5 s, remove as referências já enfileiradas; se sobrar, força GC (`Runtime.gc()` + pequena espera + `System.runFinalization()`) e verifica de novo. Os que restam são **retidos**.
 - **HeapDumpTrigger**: dispara dump quando retidos ≥ threshold (ex.: 5 com app visível, 1 em background). Debounce para não dumpar em sequência.
 - **LeakingObjectFinder próprio** *(A)*: o `KeyedWeakReferenceFinder` do Shark procura a classe `leakcanary.KeyedWeakReference`. Como a classe será nossa, é preciso implementar um `LeakingObjectFinder` que encontre instâncias da **nossa** `KeyedWeakReference` no heap e leia o campo `referent`.
-- **ObjectInspector próprio** *(A)*: pelo mesmo motivo, o inspector `KEYED_WEAK_REFERENCE` do Shark não reconhece a nossa classe. Implementar um `ObjectInspector` que marque o objeto observado como **LEAKING** ("observado desde X ms, descrição Y"), senão o status do nó vazado no trace sai errado/unknown. Gravar também um campo estático `heapDumpUptimeMillis` na nossa `KeyedWeakReference` antes do dump, para calcular há quanto tempo o objeto está retido.
-- **Análise**: `HeapAnalyzer` do Shark com `AndroidReferenceMatchers.appDefaults` e `AndroidObjectInspectors.appDefaults` + o inspector próprio, `computeRetainedHeapSize = true`. Converter o resultado para os modelos de `leakweb-model` (não expor tipos do Shark na API pública). Usar o `signature` que o Shark já calcula por `LeakTrace` como assinatura do vazamento.
+- **ObjectInspector próprio** *(A)*: pelo mesmo motivo, o inspector `KEYED_WEAK_REFERENCE` do Shark não reconhece a nossa classe. Implementar um `ObjectInspector` que marque o objeto observado como **LEAKING** ("observado desde X ms, descrição Y"), senão o status do nó vazado no trace sai errado/unknown. Em vez de um campo estático mutável `heapDumpUptimeMillis` (como o LeakCanary), o uptime do dump é passado como parâmetro ao `HprofAnalyzer`, para calcular há quanto tempo o objeto está retido.
+- **Análise**: `HeapAnalyzer` do Shark com `AndroidReferenceMatchers.appDefaults` e `AndroidObjectInspectors.appDefaults` + o inspector próprio (em heaps de JVM, usados nos testes, `AndroidReferenceMatchers.ignoredReferencesOnly` e `ObjectInspectors.jdkDefaults`, pois os defaults Android leem `android.os.Build`), `computeRetainedHeapSize = true`. Converter o resultado para os modelos de `leakweb-model` (não expor tipos do Shark na API pública). Usar o `signature` que o Shark já calcula por `LeakTrace` como assinatura do vazamento.
 - **Somente processo principal**: `LeakWebInitializer` e `LeakWeb.start` verificam o nome do processo (`Application.getProcessName()` no API 28+, `/proc/self/cmdline` antes) e não fazem nada fora do processo principal — inclusive no futuro `:leakweb`. Sem isso, cada processo sobe watchers e um servidor próprio, e o fallback troca a porta silenciosamente.
 - **Processo separado** (fase posterior): mover a análise para um `Service` em `android:process=":leakweb"` para não derrubar o app em aparelhos fracos. Comunicação por arquivo + broadcast; o processo principal recarrega o `LeakStore` ao receber o broadcast.
 - **Heap dump congela o app**: chamar `Debug.dumpHprofData` fora da main thread (o dump pausa todas as threads de qualquer forma, mas evita ANR por bloqueio da main antes/depois) e avisar no logcat e com Toast/notificação antes de dumpar.
@@ -252,11 +255,11 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** `./gradlew build` verde localmente e no CI.
 
 ### Fase 1 — Modelos e analisador (JVM)
-- [ ] Modelos em `leakweb-model`: `HeapAnalysis` (Success/Failure), `Leak`, `LeakTrace`, `LeakTraceReference`, `LeakTraceObject` (status leaking/not leaking/unknown + motivo), `MemorySample`, `Event`.
-- [ ] `KeyedWeakReference` própria em módulo JVM (usada pelo analyzer nos testes e pelo watcher na Fase 2) *(A)*.
-- [ ] `HprofAnalyzer` em `leakweb-analyzer` com `LeakingObjectFinder` e `ObjectInspector` próprios *(A)*.
-- [ ] Mapeamento Shark → modelos próprios.
-- [ ] Callback de progresso (etapas do Shark) para alimentar SSE depois.
+- [x] Modelos em `leakweb-model`: `HeapAnalysis` (Success/Failure), `Leak`, `LeakTrace`, `LeakTraceReference`, `LeakTraceObject` (status leaking/not leaking/unknown + motivo), `MemorySample`, `Event`.
+- [x] `KeyedWeakReference` própria em módulo JVM (usada pelo analyzer nos testes e pelo watcher na Fase 2) *(A)*.
+- [x] `HprofAnalyzer` em `leakweb-analyzer` com `LeakingObjectFinder` e `ObjectInspector` próprios *(A)*.
+- [x] Mapeamento Shark → modelos próprios.
+- [x] Callback de progresso (etapas do Shark) para alimentar SSE depois.
 
 **Aceite:** teste unitário que cria um vazamento proposital na própria JVM de teste (objeto observado por `KeyedWeakReference` e retido por um campo estático), gera o hprof com `HotSpotDiagnosticMXBean.dumpHeap` em diretório temporário e encontra o vazamento esperado com status LEAKING. Nada de `.hprof` versionado no git (dezenas de MB). Um teste extra com hprof Android real fica opcional (Git LFS ou baixado no CI) e entra só depois da Fase 3.
 
@@ -367,7 +370,7 @@ Pontos a resolver antes de abrir o repositório:
 | Módulo | Tipo |
 |---|---|
 | model | Unitário (serialização round-trip) |
-| analyzer | Unitário com fixtures `.hprof` em `src/test/resources` |
+| analyzer | Unitário com hprof gerado no próprio teste (`HotSpotDiagnosticMXBean.dumpHeap`), nada versionado |
 | server | Unitário do Router/rotas + integração com NanoHTTPD em porta aleatória na JVM, fakes das interfaces |
 | android | Unitário (watcher com Clock/GcTrigger fake) + instrumentado (`sample`) |
 | web | Verificação manual + (futuro) Playwright contra servidor fake na JVM |

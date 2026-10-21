@@ -27,6 +27,7 @@ rootProject.name = "leakweb"
 include(
     ":leakweb-api",
     ":leakweb-model",
+    ":leakweb-watcher",
     ":leakweb-analyzer",
     ":leakweb-server",
     ":leakweb-android",

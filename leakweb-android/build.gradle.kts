@@ -9,6 +9,7 @@ android {
 dependencies {
     api(project(":leakweb-api"))
     implementation(project(":leakweb-model"))
+    implementation(project(":leakweb-watcher"))
     implementation(project(":leakweb-analyzer"))
     implementation(project(":leakweb-server"))
 }
