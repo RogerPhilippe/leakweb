@@ -264,12 +264,12 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** teste unitário que cria um vazamento proposital na própria JVM de teste (objeto observado por `KeyedWeakReference` e retido por um campo estático), gera o hprof com `HotSpotDiagnosticMXBean.dumpHeap` em diretório temporário e encontra o vazamento esperado com status LEAKING. Nada de `.hprof` versionado no git (dezenas de MB). Um teste extra com hprof Android real fica opcional (Git LFS ou baixado no CI) e entra só depois da Fase 3.
 
 ### Fase 2 — Watcher e installers (Android)
-- [ ] `ObjectWatcher` com `Clock` e `GcTrigger` injetáveis (testáveis).
-- [ ] `ActivityWatcher` (`ActivityLifecycleCallbacks.onActivityDestroyed`).
-- [ ] `FragmentWatcher` (AndroidX `FragmentLifecycleCallbacks`: `onFragmentDestroyed` e `onFragmentViewDestroyed` para a View). `androidx.fragment` como `compileOnly`, instalado só se a classe existir em runtime — a lib não impõe a dependência ao app.
-- [ ] Guarda de processo principal (seção 4) no ponto de instalação dos watchers.
-- [ ] API pública `LeakWeb.watch(obj, description)` para objetos arbitrários.
-- [ ] Log de objetos retidos no logcat.
+- [x] `ObjectWatcher` com `Clock` e `GcTrigger` injetáveis (testáveis).
+- [x] `ActivityWatcher` (`ActivityLifecycleCallbacks.onActivityDestroyed`).
+- [x] `FragmentWatcher` (AndroidX `FragmentLifecycleCallbacks`: `onFragmentDestroyed` e `onFragmentViewDestroyed` para a View). `androidx.fragment` como `compileOnly`, instalado só se a classe existir em runtime — a lib não impõe a dependência ao app.
+- [x] Guarda de processo principal (seção 4) no ponto de instalação dos watchers.
+- [x] API pública `LeakWeb.watch(obj, description)` para objetos arbitrários.
+- [x] Log de objetos retidos no logcat.
 
 **Aceite:** no `sample`, uma Activity vazada aparece como retida no logcat após rotação/back.
 

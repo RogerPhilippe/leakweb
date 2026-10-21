@@ -23,6 +23,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".LeakingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LeakwebApp" />
     </application>
 
 </manifest>
