@@ -15,6 +15,7 @@ shark = "2.14"
 kotlinxSerialization = "1.9.0"
 androidxStartup = "1.2.0"
 androidxFragment = "1.9.1"
+kotlinxCoroutines = "1.10.2"
 
 # Build configuration shared by the convention plugins
 compileSdk = "37"
@@ -42,6 +43,8 @@ shark-android = { group = "com.squareup.leakcanary", name = "shark-android", ver
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 androidx-startup-runtime = { group = "androidx.startup", name = "startup-runtime", version.ref = "androidxStartup" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "androidxFragment" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
 # Plugin artifacts used by build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }

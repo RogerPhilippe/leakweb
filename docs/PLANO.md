@@ -274,11 +274,11 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** no `sample`, uma Activity vazada aparece como retida no logcat após rotação/back.
 
 ### Fase 3 — Heap dump + store
-- [ ] `HeapDumpTrigger` com threshold, debounce e verificação de app visível.
-- [ ] `HeapDumper` (`Debug.dumpHprofData`) em `filesDir/leakweb/dumps`.
-- [ ] Análise em background (coroutine, dispatcher dedicado) — ainda no mesmo processo.
-- [ ] `LeakStore`: persistência em JSON com `schemaVersion`, agrupamento por **assinatura** do vazamento (`signature` do Shark), limite de N dumps com remoção dos mais antigos.
-- [ ] `EventBus` (`SharedFlow`) com os eventos da seção 5.
+- [x] `HeapDumpTrigger` com threshold, debounce e verificação de app visível.
+- [x] `HeapDumper` (`Debug.dumpHprofData`) em `filesDir/leakweb/dumps`.
+- [x] Análise em background (coroutine, dispatcher dedicado) — ainda no mesmo processo.
+- [x] `LeakStore`: persistência em JSON com `schemaVersion`, agrupamento por **assinatura** do vazamento (`signature` do Shark), limite de N dumps com remoção dos mais antigos.
+- [x] `EventBus` (`SharedFlow`) com os eventos da seção 5.
 
 **Aceite:** vazamento do `sample` gera dump, análise e registro no store, sem intervenção manual.
 

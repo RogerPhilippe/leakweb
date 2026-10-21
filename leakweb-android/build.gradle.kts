@@ -18,8 +18,10 @@ dependencies {
     implementation(project(":leakweb-analyzer"))
     implementation(project(":leakweb-server"))
     implementation(libs.androidx.startup.runtime)
+    implementation(libs.kotlinx.coroutines.core)
 
     // Fragments are watched only when the app already uses AndroidX Fragment.
     compileOnly(libs.androidx.fragment)
     testImplementation(libs.androidx.fragment)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
