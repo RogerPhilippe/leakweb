@@ -297,6 +297,7 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 - [ ] `leakweb-noop` com o mesmo `object LeakWeb` (sessão vazia), já nesta fase — o `sample` em release passa a usar a API real.
 - [ ] Wiring em `leakweb-android` + `LeakWebInitializer` (`androidx.startup`) chamando `start` com config padrão.
 - [ ] Modo manual documentado (remoção do initializer no manifest) e demonstrado no `sample` com porta diferente de 8080.
+- [ ] README com instruções dos dois modos: automático (padrão, porta 8080, URL com token no logcat, `adb forward`) e manual (remoção do initializer no manifest + `LeakWeb.start(application, config)` no `Application`, acesso ao token/porta pela `LeakWebSession`).
 - [ ] Logcat ao iniciar (se `logStartup`): URL completa com token + comando `adb forward`; com `BindAddress.AllInterfaces`, também a URL com o IP da rede local.
 
 **Aceite:** testes unitários do `Router` e das rotas (sem socket) + testes de integração subindo o servidor em porta aleatória na JVM (incluindo leitura de SSE com `Accept-Encoding: gzip`, desconexão e liberação da thread); `curl` funcionando no `sample`.
