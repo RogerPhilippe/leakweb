@@ -39,7 +39,8 @@ internal data class HeapDump(
 )
 
 /**
- * Dumps the heap when enough objects are retained: [visibleThreshold] while the app is visible
+ * Dumps the heap when enough objects are retained: [visibleThreshold] (read on each check, so it can
+ * change while the app runs) while the app is visible
  * (not to freeze it too often), [backgroundThreshold] in background. Waits at least
  * [waitBetweenDumpsMillis] between two dumps.
  */
@@ -54,7 +55,7 @@ internal class HeapDumpTrigger(
     private val eventBus: EventBus,
     private val onHeapDumped: (HeapDump) -> Unit,
     private val notifyUser: (String) -> Unit = {},
-    private val visibleThreshold: Int = DEFAULT_VISIBLE_THRESHOLD,
+    private val visibleThreshold: () -> Int = { DEFAULT_VISIBLE_THRESHOLD },
     private val backgroundThreshold: Int = 1,
     private val waitBetweenDumpsMillis: Long = DEFAULT_WAIT_BETWEEN_DUMPS_MILLIS,
     private val newId: () -> String = { UUID.randomUUID().toString() },
@@ -93,7 +94,7 @@ internal class HeapDumpTrigger(
 
     private fun checkRetainedObjects() {
         val retainedCount = objectWatcher.retainedObjectCount
-        val threshold = if (isAppVisible()) visibleThreshold else backgroundThreshold
+        val threshold = if (isAppVisible()) visibleThreshold() else backgroundThreshold
         if (retainedCount == 0 || retainedCount < threshold) return
 
         val lastDump = lastDumpUptimeMillis

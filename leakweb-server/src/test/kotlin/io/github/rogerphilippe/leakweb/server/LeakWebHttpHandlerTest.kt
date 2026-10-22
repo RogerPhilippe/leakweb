@@ -142,6 +142,7 @@ class LeakWebHttpHandlerTest {
             "/api/leaks/$LEAK_SIGNATURE" to "\"analysisIds\":[\"ok-1\"]",
             "/api/retained" to "\"key\":\"k1\"",
             "/api/memory" to "\"javaHeapUsedBytes\":2",
+            "/api/memory/history" to "\"pssKb\":500",
             "/api/analyses" to "\"errorMessage\":\"boom\"",
         ).forEach { (path, expected) ->
             val response = get(path)

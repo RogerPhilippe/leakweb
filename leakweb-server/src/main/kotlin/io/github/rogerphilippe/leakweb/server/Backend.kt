@@ -37,6 +37,9 @@ interface Commands {
 
     fun memory(): MemorySample
 
+    /** Recent samples, oldest first; the next ones arrive as `memory.sample` events. */
+    fun memoryHistory(): List<MemorySample>
+
     /** Starts a heap dump in the background, ignoring the retained threshold; false if one is running. */
     fun requestHeapDump(): Boolean
 

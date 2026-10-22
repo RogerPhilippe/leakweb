@@ -33,6 +33,9 @@ class MainActivity : ComponentActivity() {
                     LeakScenarios(
                         serverUrl = LeakWeb.session.url,
                         onOpenLeakingActivity = { startActivity(Intent(this, LeakingActivity::class.java)) },
+                        onOpenViewModelLeak = { startActivity(Intent(this, ViewModelLeakActivity::class.java)) },
+                        onOpenFragmentViewLeak = { startActivity(Intent(this, FragmentViewLeakActivity::class.java)) },
+                        onStartLeakingService = { startService(Intent(this, LeakingService::class.java)) },
                         onLeakWatchedObject = ::leakWatchedObject,
                         modifier = Modifier.padding(innerPadding),
                     )
@@ -56,6 +59,9 @@ class LeakedObject
 fun LeakScenarios(
     serverUrl: String,
     onOpenLeakingActivity: () -> Unit,
+    onOpenViewModelLeak: () -> Unit,
+    onOpenFragmentViewLeak: () -> Unit,
+    onStartLeakingService: () -> Unit,
     onLeakWatchedObject: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -68,6 +74,15 @@ fun LeakScenarios(
         Text(if (serverUrl.isEmpty()) "LeakWeb server not running" else "LeakWeb: $serverUrl")
         Button(onClick = onOpenLeakingActivity) {
             Text("Open an activity that leaks (then press back)")
+        }
+        Button(onClick = onOpenViewModelLeak) {
+            Text("Open an activity whose ViewModel leaks (then press back)")
+        }
+        Button(onClick = onOpenFragmentViewLeak) {
+            Text("Open a fragment that keeps its destroyed view")
+        }
+        Button(onClick = onStartLeakingService) {
+            Text("Start a service that leaks (it stops itself)")
         }
         Button(onClick = onLeakWatchedObject) {
             Text("Leak an object watched with LeakWeb.watch()")
@@ -82,6 +97,9 @@ fun LeakScenariosPreview() {
         LeakScenarios(
             serverUrl = "http://localhost:9090/?token=abc",
             onOpenLeakingActivity = {},
+            onOpenViewModelLeak = {},
+            onOpenFragmentViewLeak = {},
+            onStartLeakingService = {},
             onLeakWatchedObject = {},
         )
     }

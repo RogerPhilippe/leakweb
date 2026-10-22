@@ -18,6 +18,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
+import shark.FilteringLeakingObjectFinder.LeakingObjectFilter
+import shark.HeapObject.HeapInstance
+import shark.ObjectInspectors
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.lang.ref.ReferenceQueue
@@ -32,6 +35,28 @@ private class LeakedObject
 private class WatchedButNotRetainedObject
 
 private class CollectedObject
+
+/** Never watched, but its state says it should be gone, like a destroyed Activity (`mDestroyed`). */
+private class DeadUnwatchedObject {
+    @Suppress("unused")
+    val destroyed = true
+}
+
+/** Same class, alive: must not be reported. */
+private class AliveUnwatchedObject {
+    @Suppress("unused")
+    val destroyed = false
+}
+
+/** Plays the role of Shark's Android filters (destroyed activity...), which need an Android heap. */
+private val destroyedFieldFilter =
+    LeakingObjectFilter { heapObject ->
+        heapObject is HeapInstance &&
+            heapObject.instanceClassName in UNWATCHED_CLASS_NAMES &&
+            heapObject[heapObject.instanceClassName, "destroyed"]?.value?.asBoolean == true
+    }
+
+private val UNWATCHED_CLASS_NAMES = setOf(DeadUnwatchedObject::class.java.name, AliveUnwatchedObject::class.java.name)
 
 /**
  * Creates a real leak in this JVM, dumps the heap with HotSpotDiagnosticMXBean and analyzes it.
@@ -70,6 +95,19 @@ class HprofAnalyzerTest {
     @Test
     fun `garbage collected object is not reported`() {
         assertNull(findTrace(CollectedObject::class.java.name))
+    }
+
+    @Test
+    fun `dead object that was never watched is reported as leaking`() {
+        val trace = traceOf<DeadUnwatchedObject>()
+
+        assertEquals(LeakingStatus.LEAKING, trace.leakingObject.leakingStatus)
+        assertTrue(trace.leakingObject.labels.none { it.startsWith("key = ") })
+    }
+
+    @Test
+    fun `alive unwatched object is not reported`() {
+        assertNull(findTrace(AliveUnwatchedObject::class.java.name))
     }
 
     @Test
@@ -129,7 +167,10 @@ class HprofAnalyzerTest {
 
             val times = ArrayDeque(listOf(START_MILLIS, END_MILLIS))
             val analysis: HeapAnalysis =
-                HprofAnalyzer { times.removeFirst() }.analyze(
+                HprofAnalyzer(
+                    currentTimeMillis = { times.removeFirst() },
+                    unwatchedLeakFilters = { ObjectInspectors.jdkLeakingObjectFilters + destroyedFieldFilter },
+                ).analyze(
                     heapDumpFile = heapDumpFile,
                     analysisId = "analysis-1",
                     heapDumpUptimeMillis = HEAP_DUMP_UPTIME_MILLIS,
@@ -162,6 +203,9 @@ class HprofAnalyzerTest {
             retainedObjects += notRetained
             watchedReferences +=
                 KeyedWeakReference(notRetained, "watched-key", "not retained", WATCH_UPTIME_MILLIS, queue)
+
+            retainedObjects += DeadUnwatchedObject()
+            retainedObjects += AliveUnwatchedObject()
 
             // Only weakly reachable: the GC done by the live heap dump clears it.
             watchedReferences +=

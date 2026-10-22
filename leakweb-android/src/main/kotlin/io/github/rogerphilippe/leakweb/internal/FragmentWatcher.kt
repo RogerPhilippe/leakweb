@@ -4,46 +4,28 @@
 package io.github.rogerphilippe.leakweb.internal
 
 import android.app.Activity
-import android.app.Application
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
+import io.github.rogerphilippe.leakweb.WatcherType
 import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
 
-private const val ANDROIDX_FRAGMENT_ACTIVITY = "androidx.fragment.app.FragmentActivity"
+internal const val ANDROIDX_FRAGMENT_ACTIVITY = "androidx.fragment.app.FragmentActivity"
 
 /**
- * Installs [AndroidXFragmentWatcher] only if the app has AndroidX Fragment on its classpath:
- * the library depends on it as `compileOnly`, so the classes may be missing at runtime.
+ * Watches destroyed fragments ([WatcherType.FRAGMENT]) and the views of fragments whose view was
+ * destroyed ([WatcherType.FRAGMENT_VIEW]), as currently enabled in [settings].
  */
-internal fun installFragmentWatcherIfAvailable(
-    application: Application,
-    objectWatcher: ObjectWatcher,
-    classExists: (String) -> Boolean = ::classExists,
-): Boolean {
-    if (!classExists(ANDROIDX_FRAGMENT_ACTIVITY)) return false
-    application.registerActivityLifecycleCallbacks(AndroidXFragmentWatcher(FragmentDestroyedReporter(objectWatcher)))
-    return true
-}
-
-private fun classExists(className: String): Boolean =
-    try {
-        Class.forName(className)
-        true
-    } catch (_: ClassNotFoundException) {
-        false
-    }
-
-/** Watches destroyed fragments and the views of fragments whose view was destroyed. */
 internal class FragmentDestroyedReporter(
     private val objectWatcher: ObjectWatcher,
+    private val settings: WatcherSettings,
 ) {
     fun onFragmentViewDestroyed(
         fragment: Any,
         view: Any?,
     ) {
-        if (view == null) return
+        if (view == null || !settings.isEnabled(WatcherType.FRAGMENT_VIEW)) return
         objectWatcher.expectWeaklyReachable(
             view,
             "${fragment.javaClass.name} received Fragment#onDestroyView() callback " +
@@ -52,6 +34,7 @@ internal class FragmentDestroyedReporter(
     }
 
     fun onFragmentDestroyed(fragment: Any) {
+        if (!settings.isEnabled(WatcherType.FRAGMENT)) return
         objectWatcher.expectWeaklyReachable(
             fragment,
             "${fragment.javaClass.name} received Fragment#onDestroy() callback",
@@ -59,12 +42,24 @@ internal class FragmentDestroyedReporter(
     }
 }
 
-/** Registers fragment callbacks on each AndroidX [FragmentActivity], including child fragments. */
+/**
+ * Registers fragment callbacks on each AndroidX [FragmentActivity], including child fragments.
+ * [viewModelWatcher] is null when AndroidX Lifecycle ViewModel is not available.
+ */
 internal class AndroidXFragmentWatcher(
     reporter: FragmentDestroyedReporter,
+    viewModelWatcher: ViewModelWatcher?,
 ) : SimpleActivityLifecycleCallbacks() {
     private val fragmentCallbacks =
         object : FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentCreated(
+                fm: FragmentManager,
+                f: Fragment,
+                savedInstanceState: Bundle?,
+            ) {
+                viewModelWatcher?.install(f)
+            }
+
             override fun onFragmentViewDestroyed(
                 fm: FragmentManager,
                 f: Fragment,

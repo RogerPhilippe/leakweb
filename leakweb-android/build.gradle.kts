@@ -20,8 +20,10 @@ dependencies {
     implementation(libs.androidx.startup.runtime)
     implementation(libs.kotlinx.coroutines.core)
 
-    // Fragments are watched only when the app already uses AndroidX Fragment.
+    // Fragments and ViewModels are watched only when the app already uses AndroidX Fragment / Lifecycle.
     compileOnly(libs.androidx.fragment)
+    compileOnly(libs.androidx.lifecycle.viewmodel)
     testImplementation(libs.androidx.fragment)
+    testImplementation(libs.androidx.lifecycle.viewmodel)
     testImplementation(libs.kotlinx.coroutines.test)
 }

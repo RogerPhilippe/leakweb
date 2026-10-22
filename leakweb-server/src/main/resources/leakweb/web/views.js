@@ -12,7 +12,6 @@ import {
   simpleClassName,
 } from './dom.js';
 
-const MEMORY_REFRESH_MILLIS = 2000;
 const CONFIRM_TIMEOUT_MILLIS = 3000;
 
 const SORTS = {
@@ -174,15 +173,24 @@ export async function retainedView(container, { onDumpHeap }) {
 }
 
 export async function memoryView(container) {
+  const history = await api.memoryHistory();
   const cards = h('div', { class: 'memory-grid' });
+  const chart = document.createElement('lw-memory-chart');
   render(
     container,
     h('h1', { text: 'Memory' }),
-    h('p', { class: 'muted', text: `Current usage of the app process, refreshed every ${MEMORY_REFRESH_MILLIS / 1000} s.` }),
+    h(
+      'p',
+      { class: 'muted' },
+      'Live usage of the app process, one sample per second. ',
+      'PSS (the whole process memory, with shared pages split between the processes using them) is slower to read ',
+      'and refreshed every 10 s.',
+    ),
     cards,
+    h('section', { class: 'card chart-card' }, h('h2', { text: 'Last 5 minutes' }), chart),
   );
-  const refresh = async () => {
-    const sample = await api.memory();
+  chart.samples = history;
+  const showSample = (sample) => {
     const usedPercent = Math.round((sample.javaHeapUsedBytes / sample.javaHeapMaxBytes) * 100);
     render(
       cards,
@@ -197,9 +205,14 @@ export async function memoryView(container) {
       memoryCard('Retained objects', sample.retainedObjectCount),
     );
   };
-  await refresh();
-  const timer = setInterval(() => refresh().catch(() => {}), MEMORY_REFRESH_MILLIS);
-  return () => clearInterval(timer);
+  showSample(history.at(-1) ?? (await api.memory()));
+  // New samples come from the live events (app.js).
+  const onSample = (event) => {
+    showSample(event.detail);
+    chart.add(event.detail);
+  };
+  document.addEventListener('leakweb:memory-sample', onSample);
+  return () => document.removeEventListener('leakweb:memory-sample', onSample);
 }
 
 function memoryCard(label, value, extra) {

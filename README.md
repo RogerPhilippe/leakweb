@@ -53,7 +53,8 @@ and every request needs the session token.
 ### Automatic mode (default)
 
 Add the dependency and run the debug build: nothing else to do. LeakWeb starts with the app
-(through `androidx.startup`), watches destroyed activities and fragments, and starts the web server on
+(through `androidx.startup`), watches destroyed activities, fragments, fragment views, ViewModels and
+services, and starts the web server on
 port **8080** (or the next free port). The URL with the token is printed in logcat, tag `LeakWeb`:
 
 ```
@@ -120,15 +121,47 @@ LeakWeb only when you want to. It needs `leakweb-noop` in release builds (see ab
 | `persistToken` | `false` | Keeps the generated token across app restarts |
 | `logStartup` | `true` | Logs the URL with the token and the `adb forward` command |
 | `retainedThreshold` | `5` | Retained objects needed to dump the heap while the app is visible (1 in background) |
-| `watchers` | Activity, Fragment | What is watched automatically |
+| `watchers` | all | What is watched automatically (see [Watchers](#watchers)); empty keeps only the server and live memory |
 
 Other calls: `LeakWeb.session` returns the running session, `LeakWeb.stop()` stops the web server
-(leaks are still detected), and `start()` again with another config restarts the server. Calling
-`start()` with the same config just returns the current session. `LeakWeb.watch(obj, "reason")`
+(leaks are still detected), and `start()` again with another config applies it: `watchers` and
+`retainedThreshold` change right away without restarting the server, the other options restart it.
+Calling `start()` with the same config just returns the current session. `LeakWeb.watch(obj, "reason")`
 watches any object that should be garbage collected soon.
 
 With `BindAddress.AllInterfaces`, logcat also shows the URL with the device IP. Anyone on the network
 who has the token can download heap dumps, so use it only on trusted networks.
+
+### Watchers
+
+| `WatcherType` | Watches | Needs |
+|---|---|---|
+| `ACTIVITY` | Activities after `onDestroy()` | — |
+| `FRAGMENT` | AndroidX fragments after `onDestroy()` | AndroidX Fragment in the app |
+| `FRAGMENT_VIEW` | Views of AndroidX fragments after `onDestroyView()` (a view or binding kept in a field) | AndroidX Fragment in the app |
+| `VIEW_MODEL` | AndroidX ViewModels after `onCleared()`, in activities and fragments | AndroidX Lifecycle in the app |
+| `SERVICE` | Services after `onDestroy()` | — |
+
+Watched objects still in memory ~5 seconds later (after a GC) are reported as retained. Besides them,
+every heap analysis also reports objects that are obviously dead even if nothing watched them
+(destroyed activity, destroyed fragment, detached view, stopped service...), so a manual heap dump
+finds them too.
+
+`VIEW_MODEL` and `SERVICE` rely on internals that Android and AndroidX do not expose:
+
+- **ViewModels**: LeakWeb replaces the private map of each `ViewModelStore`, by reflection, with a copy
+  that reports its ViewModels when the store is cleared.
+- **Services**: there is no callback for a destroyed service. LeakWeb hooks the main thread handler of
+  `ActivityThread` and wraps the app's `IActivityManager` in a proxy (non-SDK interfaces, the same
+  technique as LeakCanary) to see `serviceDoneExecuting()` after `onDestroy()`.
+
+A future Android or AndroidX version may change or block these internals. LeakWeb then logs a warning
+and leaves that watcher off; the rest keeps working. To avoid them, leave the type out of `watchers`.
+
+### Live memory
+
+The Memory section of the web UI shows the Java heap, the native heap and the PSS of the app process,
+sampled every second (PSS every 10 seconds, it is slower to read), with a chart of the last 5 minutes.
 
 ### HTTP API
 
@@ -151,7 +184,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/leaks
 | POST | `/api/heapdump` | Dumps and analyzes the heap now |
 | POST | `/api/gc` | Runs the garbage collector |
 | GET | `/api/memory` | Current memory usage |
-| GET | `/api/events` | Server-Sent Events: retained objects, heap dumps, analysis progress, new leaks |
+| GET | `/api/memory/history` | Memory samples of the last 5 minutes, oldest first |
+| GET | `/api/events` | Server-Sent Events: memory samples, retained objects, heap dumps, analysis progress, new leaks |
 
 Responses are wrapped as `{"schemaVersion": 1, "data": ...}`; errors as
 `{"schemaVersion": 1, "error": {"status": 404, "message": "..."}}`.

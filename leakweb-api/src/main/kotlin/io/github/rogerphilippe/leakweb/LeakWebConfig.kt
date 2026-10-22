@@ -18,9 +18,13 @@ data class LeakWebConfig(
     val logStartup: Boolean = true,
     /**
      * Retained objects needed to dump the heap while the app is visible (1 in background).
-     * Like [watchers], it is applied by the first start in the process; later starts only change the server.
+     * Like [watchers], a later start with another value applies it without restarting the server.
      */
     val retainedThreshold: Int = DEFAULT_RETAINED_THRESHOLD,
+    /**
+     * What is watched automatically. Empty keeps only the web server, live memory and `LeakWeb.watch()`,
+     * e.g. next to LeakCanary. Watchers turned on by a later start apply to activities created afterwards.
+     */
     val watchers: Set<WatcherType> = WatcherType.defaults,
 ) {
     init {
@@ -51,14 +55,30 @@ enum class BindAddress {
 
 /** Kinds of objects watched automatically after their lifecycle ends. */
 enum class WatcherType {
+    /** Activities after `onDestroy()`. */
     ACTIVITY,
 
-    /** AndroidX fragments and their views (only if the app uses AndroidX Fragment). */
+    /** AndroidX fragments after `onDestroy()` (only if the app uses AndroidX Fragment). */
     FRAGMENT,
+
+    /**
+     * Views of AndroidX fragments after `onDestroyView()`, e.g. a view or binding kept in a field of a
+     * fragment that is in the back stack (only if the app uses AndroidX Fragment).
+     */
+    FRAGMENT_VIEW,
+
+    /** AndroidX ViewModels after `onCleared()`, in activities and fragments (only with AndroidX Lifecycle). */
+    VIEW_MODEL,
+
+    /**
+     * Services after `onDestroy()`. Android has no callback for it, so this hooks hidden framework
+     * internals by reflection; if a future Android version blocks them, it logs a warning and stays off.
+     */
+    SERVICE,
     ;
 
     companion object {
-        val defaults: Set<WatcherType> = setOf(ACTIVITY, FRAGMENT)
+        val defaults: Set<WatcherType> = setOf(ACTIVITY, FRAGMENT, FRAGMENT_VIEW, VIEW_MODEL, SERVICE)
     }
 }
 

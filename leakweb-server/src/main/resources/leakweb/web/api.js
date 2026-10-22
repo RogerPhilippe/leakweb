@@ -25,6 +25,7 @@ export const api = {
   deleteAnalysis: (id) => request('DELETE', `/api/analyses/${encodeURIComponent(id)}`),
   retained: () => request('GET', '/api/retained'),
   memory: () => request('GET', '/api/memory'),
+  memoryHistory: () => request('GET', '/api/memory/history'),
   heapDump: () => request('POST', '/api/heapdump'),
   gc: () => request('POST', '/api/gc'),
   heapDumpUrl: (id) => `/api/analyses/${encodeURIComponent(id)}/hprof`,

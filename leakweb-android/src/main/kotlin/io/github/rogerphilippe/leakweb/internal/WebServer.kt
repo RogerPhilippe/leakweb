@@ -4,20 +4,18 @@
 package io.github.rogerphilippe.leakweb.internal
 
 import android.app.Application
-import android.os.Debug
 import android.util.Base64
 import android.util.Log
 import io.github.rogerphilippe.leakweb.BindAddress
 import io.github.rogerphilippe.leakweb.LeakWebConfig
 import io.github.rogerphilippe.leakweb.LeakWebSession
-import io.github.rogerphilippe.leakweb.model.MemorySample
+import io.github.rogerphilippe.leakweb.WatcherType
 import io.github.rogerphilippe.leakweb.model.RetainedObjectInfo
 import io.github.rogerphilippe.leakweb.model.ServerStatus
 import io.github.rogerphilippe.leakweb.server.Commands
 import io.github.rogerphilippe.leakweb.server.LeakWebServer
 import io.github.rogerphilippe.leakweb.server.ServerConfig
 import io.github.rogerphilippe.leakweb.watcher.GcTrigger
-import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
 import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -81,6 +79,10 @@ internal class RunningServer(
     }
 }
 
+/** [LeakWebConfig] without the watcher settings, which are applied without restarting the server. */
+internal fun LeakWebConfig.serverSettings(): LeakWebConfig =
+    copy(retainedThreshold = LeakWebConfig.DEFAULT_RETAINED_THRESHOLD, watchers = WatcherType.defaults)
+
 /** The fixed token, the persisted one, or a new random one (persisted if asked). */
 internal fun resolveToken(
     config: LeakWebConfig,
@@ -132,18 +134,6 @@ private fun lanIpv4Addresses(): List<String> =
             .mapNotNull { it.hostAddress }
     }.getOrDefault(emptyList())
 
-internal fun ObjectWatcher.memorySample(): MemorySample {
-    val runtime = Runtime.getRuntime()
-    return MemorySample(
-        timestampMillis = System.currentTimeMillis(),
-        javaHeapUsedBytes = runtime.totalMemory() - runtime.freeMemory(),
-        javaHeapMaxBytes = runtime.maxMemory(),
-        nativeHeapAllocatedBytes = Debug.getNativeHeapAllocatedSize(),
-        watchedObjectCount = watchedObjectCount,
-        retainedObjectCount = retainedObjectCount,
-    )
-}
-
 /** What the web server can read and do in the app. */
 internal class AndroidCommands(
     private val application: Application,
@@ -166,7 +156,9 @@ internal class AndroidCommands(
             RetainedObjectInfo(it.key, it.description, it.className, it.watchUptimeMillis, it.retainedUptimeMillis)
         }
 
-    override fun memory() = objectWatcher.memorySample()
+    override fun memory() = runtime.memorySampler.latest()
+
+    override fun memoryHistory() = runtime.memorySampler.history
 
     override fun requestHeapDump() = runtime.heapDumpTrigger.requestManualDump()
 

@@ -229,6 +229,7 @@ Regras:
 | POST | `/api/heapdump` | Dispara dump manual |
 | POST | `/api/gc` | Força GC |
 | GET | `/api/memory` | Snapshot de memória atual |
+| GET | `/api/memory/history` | Amostras de memória dos últimos 5 min (gráfico ao vivo) |
 | GET | `/api/events` | SSE: `memory.sample`, `object.retained`, `heapdump.started`, `analysis.progress`, `analysis.done`, `leak.new` |
 
 Autenticação: **todas** as rotas exigem token (cookie de sessão, `Authorization: Bearer`, `X-LeakWeb-Token` ou `?token=`), inclusive em loopback. Ver seção 4.1.
@@ -315,13 +316,17 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 **Aceite:** fluxo completo no navegador: provocar vazamento no `sample` → ver progresso → abrir trace → baixar hprof.
 
 ### Fase 6 — Memória ao vivo e mais installers
-- [ ] `MemorySampler`: heap Java (`Runtime`), nativo (`Debug.getNativeHeapAllocatedSize`), PSS periódico (mais caro, intervalo maior), contagem de objetos observados.
-- [ ] Gráfico de memória em tempo real (SVG ou `<canvas>` desenhado à mão).
-- [ ] `ViewModelWatcher`: não há como observar o `onCleared` de ViewModels de terceiros. Abordagem do LeakCanary: injetar um ViewModel próprio no `ViewModelStore` de cada Activity/Fragment e, no `onCleared` dele, ler o mapa interno do store por reflection e observar os demais. Mesmo risco de reflection do `ServiceWatcher` — isolar e tornar opcional.
-- [ ] `ServiceWatcher` (avaliar abordagem; pode exigir reflection — documentar riscos).
-- [ ] `FragmentViewWatcher`: observar a view do Fragment no `onDestroyView()` (vazamento comum: binding/view guardado num campo do Fragment).
-- [ ] Detecção sem registro na análise: procurar no heap objetos "obviamente mortos" mesmo que nunca observados (Activity com `mDestroyed`, Fragment desanexado, View desanexada), usando os inspectors do Shark, para que um dump manual também os encontre.
-- [ ] Aplicar em tempo de execução os campos de `LeakWebConfig` ligados a watchers (`retainedThreshold`, `watchers`) via novo `start`.
+- [x] `MemorySampler`: heap Java (`Runtime`), nativo (`Debug.getNativeHeapAllocatedSize`), PSS periódico (mais caro, intervalo maior), contagem de objetos observados.
+- [x] Gráfico de memória em tempo real (SVG ou `<canvas>` desenhado à mão).
+- [x] `ViewModelWatcher`: não há como observar o `onCleared` de ViewModels de terceiros. Abordagem do LeakCanary: injetar um ViewModel próprio no `ViewModelStore` de cada Activity/Fragment e, no `onCleared` dele, ler o mapa interno do store por reflection e observar os demais. Mesmo risco de reflection do `ServiceWatcher` — isolar e tornar opcional.
+  - Implementado de outra forma: no Lifecycle 2.11 o `ViewModelStore.clear()` esvazia o mapa **antes** de limpar os ViewModels, então o ViewModel injetado não vê mais os outros. O mapa privado do store é trocado (reflection) por uma cópia que reporta os ViewModels no `clear()`; funciona nas versões antigas (`mMap`) e novas (`map`).
+- [x] `ServiceWatcher` (avaliar abordagem; pode exigir reflection — documentar riscos).
+  - Hooks em APIs não-SDK (callback do `ActivityThread.mH` para `STOP_SERVICE` + proxy do `IActivityManager` para `serviceDoneExecuting`); falha → log e watcher desligado. Riscos no README.
+- [x] `FragmentViewWatcher`: observar a view do Fragment no `onDestroyView()` (vazamento comum: binding/view guardado num campo do Fragment).
+  - `WatcherType.FRAGMENT_VIEW`, separado de `FRAGMENT`.
+- [x] Detecção sem registro na análise: procurar no heap objetos "obviamente mortos" mesmo que nunca observados (Activity com `mDestroyed`, Fragment desanexado, View desanexada), usando os inspectors do Shark, para que um dump manual também os encontre.
+- [x] Aplicar em tempo de execução os campos de `LeakWebConfig` ligados a watchers (`retainedThreshold`, `watchers`) via novo `start`.
+  - Sem reiniciar o servidor; watchers ligados depois valem para activities criadas a partir daí.
 
 ### Fase 7 — Robustez
 - [ ] Análise em processo separado (`:leakweb`).

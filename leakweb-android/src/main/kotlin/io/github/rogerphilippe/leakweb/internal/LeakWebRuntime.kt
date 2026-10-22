@@ -10,7 +10,6 @@ import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import io.github.rogerphilippe.leakweb.LeakWebConfig
-import io.github.rogerphilippe.leakweb.WatcherType
 import io.github.rogerphilippe.leakweb.analyzer.HprofAnalyzer
 import io.github.rogerphilippe.leakweb.model.Event
 import io.github.rogerphilippe.leakweb.watcher.Clock
@@ -27,13 +26,21 @@ import java.util.concurrent.TimeUnit
 
 internal const val LEAKWEB_TAG = "LeakWeb"
 
-/** Everything LeakWeb runs in the app process: watchers, heap dumps, analysis, store and events. */
+/**
+ * Everything LeakWeb runs in the app process: watchers, heap dumps, analysis, store, events and
+ * memory sampling.
+ */
 internal class LeakWebRuntime private constructor(
     val objectWatcher: ObjectWatcher,
     val store: LeakStore,
     val eventBus: EventBus,
     val heapDumpTrigger: HeapDumpTrigger,
+    val memorySampler: MemorySampler,
+    private val watcherInstaller: WatcherInstaller,
 ) {
+    /** Applies the watcher settings of [config] (watchers, retained threshold) while the app runs. */
+    fun applyConfig(config: LeakWebConfig) = watcherInstaller.apply(config)
+
     companion object {
         /** Delay before checking if a watched object was garbage collected. */
         private const val RETAINED_DELAY_SECONDS = 5L
@@ -50,6 +57,7 @@ internal class LeakWebRuntime private constructor(
                     clock = clock,
                     checkRetainedExecutor = { watcherThread.schedule(it, RETAINED_DELAY_SECONDS, TimeUnit.SECONDS) },
                 )
+            val settings = WatcherSettings(config)
             val store = LeakStore(File(application.filesDir, "leakweb"))
             val eventBus = EventBus()
             val analysisScope =
@@ -79,15 +87,30 @@ internal class LeakWebRuntime private constructor(
                     store = store,
                     eventBus = eventBus,
                     onHeapDumped = { analysisRunner.analyze(it) },
-                    visibleThreshold = config.retainedThreshold,
+                    visibleThreshold = { settings.retainedThreshold },
                     notifyUser = { message ->
                         mainHandler.post { Toast.makeText(application, message, Toast.LENGTH_LONG).show() }
                     },
                 )
             visibilityTracker = AppVisibilityTracker { heapDumpTrigger.onAppVisibilityChanged() }
 
-            objectWatcher.addOnObjectRetainedListener(RetainedObjectLogger)
-            objectWatcher.addOnObjectRetainedListener { retainedObject, retainedObjectCount ->
+            objectWatcher.reportRetainedObjects(eventBus, heapDumpTrigger)
+            application.registerActivityLifecycleCallbacks(visibilityTracker)
+            val watcherInstaller =
+                WatcherInstaller(objectWatcher, settings, application::registerActivityLifecycleCallbacks).apply {
+                    apply(config)
+                }
+
+            val memorySampler = startMemorySampler(clock, objectWatcher, eventBus)
+            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger, memorySampler, watcherInstaller)
+        }
+
+        private fun ObjectWatcher.reportRetainedObjects(
+            eventBus: EventBus,
+            heapDumpTrigger: HeapDumpTrigger,
+        ) {
+            addOnObjectRetainedListener(RetainedObjectLogger)
+            addOnObjectRetainedListener { retainedObject, retainedObjectCount ->
                 eventBus.post(
                     Event.ObjectRetained(
                         key = retainedObject.key,
@@ -98,22 +121,25 @@ internal class LeakWebRuntime private constructor(
                 )
                 heapDumpTrigger.onObjectRetained()
             }
-            application.registerActivityLifecycleCallbacks(visibilityTracker)
-            installWatchers(application, objectWatcher, config.watchers)
-            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger)
         }
 
-        private fun installWatchers(
-            application: Application,
+        private fun startMemorySampler(
+            clock: Clock,
             objectWatcher: ObjectWatcher,
-            watchers: Set<WatcherType>,
-        ) {
-            if (WatcherType.ACTIVITY in watchers) {
-                application.registerActivityLifecycleCallbacks(ActivityWatcher(objectWatcher))
-            }
-            if (WatcherType.FRAGMENT in watchers) {
-                installFragmentWatcherIfAvailable(application, objectWatcher)
-            }
+            eventBus: EventBus,
+        ): MemorySampler {
+            val sampler =
+                MemorySampler(clock, AndroidMemoryReader(objectWatcher), onSample = { sample ->
+                    eventBus.post(Event.MemorySampled(sample))
+                })
+            singleThreadScheduler("LeakWeb-memory").scheduleWithFixedDelay(
+                // An exception would cancel the next runs.
+                { runCatching { sampler.sample() } },
+                0L,
+                MemorySampler.SAMPLE_INTERVAL_MILLIS,
+                TimeUnit.MILLISECONDS,
+            )
+            return sampler
         }
 
         private fun singleThreadScheduler(name: String): ScheduledExecutorService =

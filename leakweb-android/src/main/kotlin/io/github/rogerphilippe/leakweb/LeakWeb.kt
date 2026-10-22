@@ -9,6 +9,7 @@ import io.github.rogerphilippe.leakweb.internal.LEAKWEB_TAG
 import io.github.rogerphilippe.leakweb.internal.LeakWebRuntime
 import io.github.rogerphilippe.leakweb.internal.RunningServer
 import io.github.rogerphilippe.leakweb.internal.isMainProcess
+import io.github.rogerphilippe.leakweb.internal.serverSettings
 import java.io.IOException
 
 /**
@@ -30,9 +31,9 @@ object LeakWeb {
         get() = server?.session ?: LeakWebSession.NOT_RUNNING
 
     /**
-     * Starts watching for leaks and the web server. Calling it again with the same [config] returns the
-     * current session; with another config it restarts the server (the watchers and the retained
-     * threshold keep the config of the first start).
+     * Starts watching for leaks and the web server. Calling it again applies the watcher settings of
+     * [config] ([LeakWebConfig.watchers], [LeakWebConfig.retainedThreshold]) and restarts the server only
+     * if one of its settings changed; otherwise it returns the current session.
      *
      * Does nothing outside the main process. Never throws: if no port can be bound, it logs the error
      * and returns [LeakWebSession.NOT_RUNNING].
@@ -47,12 +48,11 @@ object LeakWeb {
             return LeakWebSession.NOT_RUNNING
         }
         val installed =
-            runtime ?: LeakWebRuntime.install(application, config).also {
-                runtime = it
-                Log.i(LEAKWEB_TAG, "LeakWeb installed, watching ${config.watchers.joinToString()}")
-            }
+            runtime?.also { it.applyConfig(config) }
+                ?: LeakWebRuntime.install(application, config).also { runtime = it }
+        Log.i(LEAKWEB_TAG, "LeakWeb watching: ${config.watchers.joinToString().ifEmpty { "nothing" }}")
         server?.let { running ->
-            if (running.config == config) return running.session
+            if (running.config.serverSettings() == config.serverSettings()) return running.session
             running.stop()
             server = null
         }

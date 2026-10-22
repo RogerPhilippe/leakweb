@@ -15,6 +15,9 @@
   --warning: light-dark(#a15c00, #f0b44c);
   --leaking-bg: light-dark(#fdecec, #3a1f22);
   --suspect-bg: light-dark(#fff4d6, #3a3018);
+  --chart-java: var(--accent);
+  --chart-native: light-dark(#c2410c, #fb923c);
+  --chart-pss: light-dark(#7c3aed, #b794f6);
   --radius: 10px;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -551,6 +554,99 @@ a.card:hover {
 
 .memory-card meter {
   width: 100%;
+}
+
+/* Memory chart (lw-memory-chart) */
+
+.chart-card {
+  display: block;
+  margin-top: 0.75rem;
+
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 500;
+  }
+}
+
+lw-memory-chart {
+  display: block;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: clamp(200px, 40vh, 360px);
+  touch-action: none;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.chart-cursor {
+  stroke: var(--muted);
+  stroke-dasharray: 3 3;
+}
+
+.chart-dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.series-java {
+  --series: var(--chart-java);
+}
+
+.series-native {
+  --series: var(--chart-native);
+}
+
+.series-pss {
+  --series: var(--chart-pss);
+}
+
+.chart-line[class*='series-'] {
+  stroke: var(--series);
+}
+
+.chart-dot[class*='series-'] {
+  fill: var(--series);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+
+  .swatch {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.4em;
+    border-radius: 2px;
+    background: var(--series);
+    vertical-align: -0.05em;
+  }
 }
 
 /* Analyses table */

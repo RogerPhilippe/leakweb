@@ -48,6 +48,17 @@ class WebServerTest {
         assertEquals(first, tokenFile.readText())
     }
 
+    @Test
+    fun `only server settings decide whether a new start restarts the server`() {
+        val config = LeakWebConfig(port = 9090)
+
+        assertEquals(
+            config.serverSettings(),
+            config.copy(retainedThreshold = 1, watchers = emptySet()).serverSettings(),
+        )
+        assertNotEquals(config.serverSettings(), config.copy(port = 9091).serverSettings())
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `tokens that would need escaping are rejected`() {
         LeakWebConfig(token = "a b;c")

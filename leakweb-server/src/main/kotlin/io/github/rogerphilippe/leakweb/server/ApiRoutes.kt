@@ -68,6 +68,9 @@ internal class ApiRoutes(
             jsonResponse(CommandResult.serializer(), CommandResult(accepted = true, message = "Garbage collection run"))
         }
         router.get("/api/memory") { jsonResponse(MemorySample.serializer(), commands.memory()) }
+        router.get("/api/memory/history") {
+            jsonResponse(ListSerializer(MemorySample.serializer()), commands.memoryHistory())
+        }
         router.get("/api/events") {
             HttpResponse(
                 status = HttpStatus.OK,

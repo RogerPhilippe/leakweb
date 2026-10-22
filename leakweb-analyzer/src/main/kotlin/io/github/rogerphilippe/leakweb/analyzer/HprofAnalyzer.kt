@@ -8,9 +8,12 @@ import io.github.rogerphilippe.leakweb.model.HeapAnalysisFailure
 import io.github.rogerphilippe.leakweb.model.HeapAnalysisSuccess
 import shark.AndroidObjectInspectors
 import shark.AndroidReferenceMatchers
+import shark.FilteringLeakingObjectFinder
+import shark.FilteringLeakingObjectFinder.LeakingObjectFilter
 import shark.HeapAnalyzer
 import shark.HeapGraph
 import shark.HprofHeapGraph.Companion.openHeapGraph
+import shark.LeakingObjectFinder
 import shark.ObjectInspectors
 import shark.OnAnalysisProgressListener
 import java.io.File
@@ -26,10 +29,20 @@ fun interface AnalysisProgressListener {
     )
 }
 
-/** Finds leaks of objects watched with `KeyedWeakReference` in a heap dump, using Shark. */
-class HprofAnalyzer(
-    private val currentTimeMillis: () -> Long = System::currentTimeMillis,
+/**
+ * Finds leaks in a heap dump with Shark: objects watched with `KeyedWeakReference` and retained, plus
+ * objects that are obviously dead although nobody watched them (destroyed activity, destroyed
+ * fragment, detached view, stopped service...), so that a manual dump also finds them.
+ */
+class HprofAnalyzer internal constructor(
+    private val currentTimeMillis: () -> Long,
+    /** Tells which unwatched objects are dead; tests replace it since the Android ones need an Android heap. */
+    private val unwatchedLeakFilters: (HeapGraph) -> List<LeakingObjectFilter>,
 ) {
+    constructor(
+        currentTimeMillis: () -> Long = System::currentTimeMillis,
+    ) : this(currentTimeMillis, { graph -> graph.leakingObjectFilters() })
+
     /**
      * @param heapDumpUptimeMillis uptime when the heap was dumped, in the same clock as the
      * watch/retained times of the `KeyedWeakReference`s; used to report how long objects were retained.
@@ -55,7 +68,7 @@ class HprofAnalyzer(
                         HeapAnalyzer(sharkListener).analyze(
                             heapDumpFile = heapDumpFile,
                             graph = graph,
-                            leakingObjectFinder = KeyedWeakReferenceFinder(),
+                            leakingObjectFinder = graph.leakingObjectFinder(),
                             referenceMatchers = graph.referenceMatchers(),
                             computeRetainedHeapSize = true,
                             objectInspectors =
@@ -105,16 +118,20 @@ class HprofAnalyzer(
         )
     }
 
-    // The Android defaults read android.os.Build from the heap, so they only work on Android heaps;
-    // JVM heaps (the analyzer tests) use the JDK-only configuration.
-    private fun HeapGraph.isAndroidHeap(): Boolean = findClassByName(ANDROID_BUILD_CLASS_NAME) != null
-
     private fun HeapGraph.referenceMatchers() =
         if (isAndroidHeap()) {
             AndroidReferenceMatchers.appDefaults
         } else {
             AndroidReferenceMatchers.ignoredReferencesOnly
         }
+
+    // Finding the unwatched objects scans every object of the heap, which makes the analysis slower.
+    private fun HeapGraph.leakingObjectFinder(): LeakingObjectFinder {
+        val unwatchedFinder = FilteringLeakingObjectFinder(unwatchedLeakFilters(this))
+        return LeakingObjectFinder { graph ->
+            KeyedWeakReferenceFinder().findLeakingObjectIds(graph) + unwatchedFinder.findLeakingObjectIds(graph)
+        }
+    }
 
     private fun HeapGraph.objectInspectors() =
         if (isAndroidHeap()) {
@@ -124,8 +141,19 @@ class HprofAnalyzer(
         }
 
     private companion object {
+        fun HeapGraph.leakingObjectFilters(): List<LeakingObjectFilter> =
+            if (isAndroidHeap()) {
+                AndroidObjectInspectors.appLeakingObjectFilters
+            } else {
+                ObjectInspectors.jdkLeakingObjectFilters
+            }
+
         const val PERCENT = 100
         const val ANDROID_BUILD_CLASS_NAME = "android.os.Build"
         val STEP_COUNT = OnAnalysisProgressListener.Step.values().size
+
+        // The Android defaults read android.os.Build from the heap, so they only work on Android heaps;
+        // JVM heaps (the analyzer tests) use the JDK-only configuration.
+        fun HeapGraph.isAndroidHeap(): Boolean = findClassByName(ANDROID_BUILD_CLASS_NAME) != null
     }
 }

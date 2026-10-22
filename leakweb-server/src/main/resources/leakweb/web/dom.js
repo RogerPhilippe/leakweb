@@ -20,6 +20,20 @@ export function h(tag, attrs = {}, ...children) {
   return element;
 }
 
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+/** Creates an SVG element. `attrs` keys: `class`, `text`, anything else is set with setAttribute. */
+export function svg(tag, attrs = {}, ...children) {
+  const element = document.createElementNS(SVG_NAMESPACE, tag);
+  for (const [name, value] of Object.entries(attrs)) {
+    if (value === null || value === undefined || value === false) continue;
+    if (name === 'text') element.textContent = String(value);
+    else element.setAttribute(name, String(value));
+  }
+  append(element, children);
+  return element;
+}
+
 function append(parent, children) {
   for (const child of children.flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
@@ -68,6 +82,10 @@ export function formatRelative(timestampMillis) {
     value = Math.round(value / size);
   }
   return '';
+}
+
+export function formatTime(timestampMillis) {
+  return new Date(timestampMillis).toLocaleTimeString();
 }
 
 export function formatDate(timestampMillis) {

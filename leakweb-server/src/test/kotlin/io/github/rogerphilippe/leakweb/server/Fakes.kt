@@ -71,6 +71,8 @@ internal class FakeCommands : Commands {
 
     override fun memory() = MemorySample(1, 2, 3, 4, null, 3, 1)
 
+    override fun memoryHistory() = listOf(MemorySample(0, 1, 3, 4, 500, 3, 1), memory())
+
     override fun requestHeapDump(): Boolean {
         heapDumpRequests++
         return true

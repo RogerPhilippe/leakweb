@@ -108,7 +108,7 @@ function showProgress(label, percent) {
 
 function connectEvents() {
   const events = new EventSource('/api/events');
-  events.addEventListener('open', () => setConnection('Live', true));
+  events.addEventListener('open', () => setConnection('Connected', true));
   events.addEventListener('error', () => {
     setConnection('Reconnecting', false);
     // The browser gives up after an HTTP error (e.g. the app restarted); keep trying.
@@ -120,6 +120,8 @@ function connectEvents() {
     setBadge(retainedCount, data.retainedObjectCount);
     if (location.hash === '#/retained') showRoute();
   });
+  // Views that show live memory listen to this DOM event.
+  on('memory.sample', (data) => document.dispatchEvent(new CustomEvent('leakweb:memory-sample', { detail: data.sample })));
   on('heapdump.started', () => showProgress('Dumping heap…', null));
   on('analysis.progress', (data) => {
     // The dump is written: the objects it holds are no longer watched.

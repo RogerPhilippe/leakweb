@@ -19,6 +19,7 @@ class HeapDumpTriggerTest {
 
     private var now = 10_000L
     private var visible = true
+    private var visibleThreshold = 3
     private var dumpFails = false
     private val scheduled = mutableListOf<Pair<Long, Runnable>>()
     private val dumpedFiles = mutableListOf<File>()
@@ -45,7 +46,7 @@ class HeapDumpTriggerTest {
             store = store,
             eventBus = eventBus,
             onHeapDumped = { heapDumps += it },
-            visibleThreshold = 3,
+            visibleThreshold = { visibleThreshold },
             backgroundThreshold = 1,
             waitBetweenDumpsMillis = 60_000L,
             newId = { "dump-${heapDumps.size + dumpedFiles.size}" },
@@ -84,6 +85,17 @@ class HeapDumpTriggerTest {
         assertEquals("dump-0", heapDump.id)
         assertEquals(10_000L, heapDump.uptimeMillis)
         assertEquals(store.newHeapDumpFile("dump-0"), heapDump.file)
+    }
+
+    @Test
+    fun `a threshold changed while the app runs applies to the next check`() {
+        retain(2)
+        visibleThreshold = 2
+
+        trigger.onObjectRetained()
+        runScheduled()
+
+        assertEquals(1, heapDumps.size)
     }
 
     @Test

@@ -28,6 +28,17 @@
             android:name=".LeakingActivity"
             android:exported="false"
             android:theme="@style/Theme.LeakwebApp" />
+        <activity
+            android:name=".ViewModelLeakActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LeakwebApp" />
+        <activity
+            android:name=".FragmentViewLeakActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LeakwebApp" />
+        <service
+            android:name=".LeakingService"
+            android:exported="false" />
     </application>
 
 </manifest>

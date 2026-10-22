@@ -12,7 +12,10 @@ data class MemorySample(
     val javaHeapUsedBytes: Long,
     val javaHeapMaxBytes: Long,
     val nativeHeapAllocatedBytes: Long,
-    /** Proportional set size; sampled less often because it is expensive to read. */
+    /**
+     * Proportional set size, null until first read. It is expensive to read, so it is refreshed less
+     * often than the other values and samples in between repeat the last value.
+     */
     val pssKb: Long? = null,
     val watchedObjectCount: Int,
     val retainedObjectCount: Int,
