@@ -35,7 +35,7 @@ internal class LeakWebRuntime private constructor(
     val store: LeakStore,
     val eventBus: EventBus,
     val heapDumpTrigger: HeapDumpTrigger,
-    val memorySampler: MemorySampler,
+    val liveMemory: LiveMemory,
     private val watcherInstaller: WatcherInstaller,
 ) {
     /** Applies the watcher settings of [config] (watchers, retained threshold) while the app runs. */
@@ -101,8 +101,8 @@ internal class LeakWebRuntime private constructor(
                     apply(config)
                 }
 
-            val memorySampler = startMemorySampler(clock, objectWatcher, eventBus)
-            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger, memorySampler, watcherInstaller)
+            val liveMemory = liveMemory(application, clock, objectWatcher, eventBus).apply { restore() }
+            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger, liveMemory, watcherInstaller)
         }
 
         private fun ObjectWatcher.reportRetainedObjects(
@@ -123,23 +123,24 @@ internal class LeakWebRuntime private constructor(
             }
         }
 
-        private fun startMemorySampler(
+        private fun liveMemory(
+            application: Application,
             clock: Clock,
             objectWatcher: ObjectWatcher,
             eventBus: EventBus,
-        ): MemorySampler {
-            val sampler =
-                MemorySampler(clock, AndroidMemoryReader(objectWatcher), onSample = { sample ->
-                    eventBus.post(Event.MemorySampled(sample))
-                })
-            singleThreadScheduler("LeakWeb-memory").scheduleWithFixedDelay(
-                // An exception would cancel the next runs.
-                { runCatching { sampler.sample() } },
-                0L,
-                MemorySampler.SAMPLE_INTERVAL_MILLIS,
-                TimeUnit.MILLISECONDS,
+        ): LiveMemory {
+            val memoryThread = singleThreadScheduler("LeakWeb-memory")
+            return LiveMemory(
+                sampler =
+                    MemorySampler(clock, AndroidMemoryReader(objectWatcher), onSample = { sample ->
+                        eventBus.post(Event.MemorySampled(sample))
+                    }),
+                stateFile = File(application.filesDir, "leakweb/live-memory"),
+                executor = { intervalMillis, command ->
+                    memoryThread.scheduleWithFixedDelay(command, 0L, intervalMillis, TimeUnit.MILLISECONDS)
+                },
+                onChanged = { enabled -> eventBus.post(Event.LiveMemoryChanged(enabled)) },
             )
-            return sampler
         }
 
         private fun singleThreadScheduler(name: String): ScheduledExecutorService =

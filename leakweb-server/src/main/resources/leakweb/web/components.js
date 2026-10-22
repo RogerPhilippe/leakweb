@@ -1,6 +1,7 @@
 // Web Components. Light DOM, so the page stylesheet applies.
 
 import { formatBytes, formatTime, h, render, simpleClassName, svg } from './dom.js';
+import { dumpProgress } from './dump-progress.js';
 
 const STATUS_LABELS = { LEAKING: 'Leaking', NOT_LEAKING: 'Not leaking', UNKNOWN: 'Unknown' };
 
@@ -237,6 +238,52 @@ function niceCeiling(value) {
   return step * magnitude * unit;
 }
 
+/**
+ * Button that requests a heap dump (`leakweb:dump-request` event, handled by app.js). While a dump or
+ * its analysis runs, a progress bar takes its place, in every dump button of the page.
+ */
+class DumpButtonElement extends HTMLElement {
+  #unsubscribe = null;
+
+  connectedCallback() {
+    this.#unsubscribe = dumpProgress.subscribe(() => this.update());
+    this.update();
+  }
+
+  disconnectedCallback() {
+    this.#unsubscribe?.();
+  }
+
+  update() {
+    const state = dumpProgress.get();
+    if (state.phase === 'idle') {
+      render(
+        this,
+        h('button', {
+          type: 'button',
+          class: 'primary',
+          text: this.getAttribute('label') ?? 'Dump heap',
+          onClick: () => this.dispatchEvent(new CustomEvent('leakweb:dump-request', { bubbles: true })),
+        }),
+      );
+      return;
+    }
+    const analyzing = state.phase === 'analyzing';
+    const label = analyzing ? `Analyzing: ${state.step.toLowerCase().replaceAll('_', ' ')}` : 'Dumping heap…';
+    render(
+      this,
+      h(
+        'span',
+        { class: 'dump-progress', role: 'status', title: label },
+        // No value: indeterminate while the app is frozen by the dump.
+        h('progress', { max: 100, value: analyzing ? state.percent : null }),
+        h('span', { class: 'dump-progress-label', text: label }),
+      ),
+    );
+  }
+}
+
+customElements.define('lw-dump-button', DumpButtonElement);
 customElements.define('lw-leak-trace', LeakTraceElement);
 customElements.define('lw-memory-chart', MemoryChartElement);
 customElements.define('lw-toasts', ToastsElement);

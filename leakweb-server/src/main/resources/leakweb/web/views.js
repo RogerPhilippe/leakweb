@@ -133,7 +133,7 @@ export async function leakDetailView(container, signature) {
   );
 }
 
-export async function retainedView(container, { onDumpHeap }) {
+export async function retainedView(container) {
   const retained = await api.retained();
   render(
     container,
@@ -144,7 +144,7 @@ export async function retainedView(container, { onDumpHeap }) {
       'Objects still in memory after their lifecycle ended, not analyzed yet. ',
       'The heap is dumped automatically when enough of them pile up.',
     ),
-    h('div', { class: 'toolbar' }, h('button', { type: 'button', class: 'primary', onClick: onDumpHeap, text: 'Dump heap now' })),
+    h('div', { class: 'toolbar' }, h('lw-dump-button', { label: 'Dump heap now' })),
     retained.length === 0
       ? message('Nothing retained right now.')
       : h(
@@ -172,24 +172,31 @@ export async function retainedView(container, { onDumpHeap }) {
   );
 }
 
+/**
+ * Live memory is off by default. The toggle turns sampling on or off in the app itself: it keeps
+ * running after this page is closed, until it is turned off. Starting it clears the chart.
+ */
 export async function memoryView(container) {
-  const history = await api.memoryHistory();
   const cards = h('div', { class: 'memory-grid' });
   const chart = document.createElement('lw-memory-chart');
-  render(
-    container,
-    h('h1', { text: 'Memory' }),
-    h(
-      'p',
-      { class: 'muted' },
-      'Live usage of the app process, one sample per second. ',
-      'PSS (the whole process memory, with shared pages split between the processes using them) is slower to read ',
-      'and refreshed every 10 s.',
-    ),
-    cards,
-    h('section', { class: 'card chart-card' }, h('h2', { text: 'Last 5 minutes' }), chart),
-  );
-  chart.samples = history;
+  const chartCard = h('section', { class: 'card chart-card' }, h('h2', { text: 'Last 5 minutes' }), chart);
+  const state = h('p', { class: 'live-state' });
+  let live = false;
+  const toggle = h('button', {
+    type: 'button',
+    onClick: async () => {
+      toggle.disabled = true;
+      try {
+        await (live ? api.stopLiveMemory() : api.startLiveMemory());
+        await load();
+      } catch (error) {
+        state.textContent = error.message;
+      } finally {
+        toggle.disabled = false;
+      }
+    },
+  });
+
   const showSample = (sample) => {
     const usedPercent = Math.round((sample.javaHeapUsedBytes / sample.javaHeapMaxBytes) * 100);
     render(
@@ -205,14 +212,58 @@ export async function memoryView(container) {
       memoryCard('Retained objects', sample.retainedObjectCount),
     );
   };
-  showSample(history.at(-1) ?? (await api.memory()));
-  // New samples come from the live events (app.js).
+
+  const load = async () => {
+    const [status, history] = await Promise.all([api.status(), api.memoryHistory()]);
+    live = status.liveMemoryEnabled;
+    toggle.textContent = live ? 'Stop live monitoring' : 'Start live monitoring';
+    toggle.className = live ? 'danger' : 'primary';
+    toggle.setAttribute('aria-pressed', String(live));
+    state.classList.toggle('on', live);
+    if (live) {
+      state.textContent =
+        'Live: one sample per second (PSS every 10 s). It keeps running in the app, even with this page closed ' +
+        'or after an app restart, until you stop it.';
+    } else if (history.length > 0) {
+      state.textContent = 'Stopped. The chart keeps the samples collected until then; starting again clears it.';
+    } else {
+      state.textContent = 'Stopped: nothing is sampled. The values below were read when the page opened.';
+    }
+    chart.samples = history;
+    chartCard.hidden = !live && history.length === 0;
+    showSample((live && history.at(-1)) || (await api.memory()));
+  };
+
+  render(
+    container,
+    h('div', { class: 'view-head' }, h('h1', { text: 'Memory' }), toggle),
+    h(
+      'p',
+      { class: 'muted' },
+      'Memory of the app process: Java heap, native heap and PSS (the whole process memory, with shared pages ',
+      'split between the processes using them).',
+    ),
+    state,
+    cards,
+    chartCard,
+  );
+  await load();
+
+  // Samples and on/off changes (maybe from another tab) come from the live events (app.js).
   const onSample = (event) => {
+    if (!live) return;
     showSample(event.detail);
     chart.add(event.detail);
   };
+  const onLiveChanged = (event) => {
+    if (event.detail !== live) load().catch(() => {});
+  };
   document.addEventListener('leakweb:memory-sample', onSample);
-  return () => document.removeEventListener('leakweb:memory-sample', onSample);
+  document.addEventListener('leakweb:memory-live', onLiveChanged);
+  return () => {
+    document.removeEventListener('leakweb:memory-sample', onSample);
+    document.removeEventListener('leakweb:memory-live', onLiveChanged);
+  };
 }
 
 function memoryCard(label, value, extra) {

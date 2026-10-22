@@ -5,9 +5,18 @@ package io.github.rogerphilippe.leakweb.internal
 
 import io.github.rogerphilippe.leakweb.model.MemorySample
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.util.concurrent.CompletableFuture
 
 class MemorySamplerTest {
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
     private var now = 0L
     private var pssReads = 0
     private var reads = 0
@@ -67,13 +76,82 @@ class MemorySamplerTest {
     }
 
     @Test
-    fun `latest is the last sample, or a new one before the first`() {
-        val first = sampler.latest()
-        assertEquals(1, reads)
+    fun `a snapshot reads PSS and is not kept in the history`() {
+        val snapshot = sampler.snapshot()
 
-        sampleEverySecond(1)
+        assertEquals(1_000L, snapshot.pssKb)
+        assertTrue(sampler.history.isEmpty())
+        assertTrue(published.isEmpty())
+    }
 
-        assertEquals(sampler.history.last(), sampler.latest())
-        assertEquals(listOf(first.timestampMillis, 2_000L), sampler.history.map { it.timestampMillis })
+    @Test
+    fun `clearing forgets the history and reads PSS again`() {
+        sampleEverySecond(2)
+
+        sampler.clear()
+        sampler.sample()
+
+        assertEquals(1, sampler.history.size)
+        assertEquals(2, pssReads)
+    }
+
+    // LiveMemory
+
+    private val stateFile by lazy { File(tempFolder.root, "leakweb/live-memory") }
+    private val scheduled = mutableListOf<Pair<Runnable, CompletableFuture<Unit>>>()
+    private val changes = mutableListOf<Boolean>()
+
+    private fun liveMemory() =
+        LiveMemory(
+            sampler = sampler,
+            stateFile = stateFile,
+            executor = { _, command -> CompletableFuture<Unit>().also { scheduled += command to it } },
+            onChanged = { changes += it },
+        )
+
+    @Test
+    fun `live memory is off by default and samples nothing`() {
+        val liveMemory = liveMemory()
+        liveMemory.restore()
+
+        assertFalse(liveMemory.isEnabled)
+        assertTrue(scheduled.isEmpty())
+    }
+
+    @Test
+    fun `turning live memory on clears the history and samples until it is turned off`() {
+        sampleEverySecond(3)
+        val liveMemory = liveMemory()
+
+        liveMemory.setEnabled(true)
+        assertTrue(sampler.history.isEmpty())
+        scheduled.single().first.run()
+        assertEquals(1, sampler.history.size)
+
+        liveMemory.setEnabled(false)
+        assertTrue(scheduled.single().second.isCancelled)
+        assertEquals(listOf(true, false), changes)
+    }
+
+    @Test
+    fun `turning it on twice starts sampling once`() {
+        val liveMemory = liveMemory()
+
+        liveMemory.setEnabled(true)
+        liveMemory.setEnabled(true)
+
+        assertEquals(1, scheduled.size)
+        assertEquals(listOf(true), changes)
+    }
+
+    @Test
+    fun `live memory stays on across app restarts until turned off`() {
+        liveMemory().setEnabled(true)
+
+        val afterRestart = liveMemory().apply { restore() }
+        assertTrue(afterRestart.isEnabled)
+
+        afterRestart.setEnabled(false)
+        assertFalse(liveMemory().apply { restore() }.isEnabled)
     }
 }

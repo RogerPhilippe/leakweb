@@ -58,6 +58,7 @@ internal class HeapDumpTrigger(
     private val visibleThreshold: () -> Int = { DEFAULT_VISIBLE_THRESHOLD },
     private val backgroundThreshold: Int = 1,
     private val waitBetweenDumpsMillis: Long = DEFAULT_WAIT_BETWEEN_DUMPS_MILLIS,
+    private val manualDumpDelayMillis: Long = DEFAULT_MANUAL_DUMP_DELAY_MILLIS,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val checkScheduled = AtomicBoolean(false)
@@ -71,10 +72,14 @@ internal class HeapDumpTrigger(
     /** Going to background lowers the threshold, so it can be time to dump. */
     fun onAppVisibilityChanged() = scheduleCheck(0L)
 
-    /** Dumps the heap now, whatever the retained count; false if a requested dump did not start yet. */
+    /**
+     * Dumps the heap now, whatever the retained count; false if a requested dump did not start yet.
+     * It starts [manualDumpDelayMillis] later: the dump freezes every thread, the web server included,
+     * so the HTTP response and the "dump started" event must be sent first.
+     */
     fun requestManualDump(): Boolean {
         if (!manualDumpPending.compareAndSet(false, true)) return false
-        executor.schedule(0L) {
+        executor.schedule(manualDumpDelayMillis) {
             try {
                 dumpHeap(objectWatcher.retainedObjectCount, "Dumping the heap on request")
             } finally {
@@ -128,11 +133,13 @@ internal class HeapDumpTrigger(
             }.onFailure { error ->
                 file.delete()
                 Log.w(LEAKWEB_TAG, "Heap dump failed", error)
+                eventBus.post(Event.HeapDumpFailed(error.message ?: error.javaClass.name))
             }
     }
 
     private companion object {
         const val DEFAULT_VISIBLE_THRESHOLD = 5
         const val DEFAULT_WAIT_BETWEEN_DUMPS_MILLIS = 60_000L
+        const val DEFAULT_MANUAL_DUMP_DELAY_MILLIS = 300L
     }
 }

@@ -14,6 +14,8 @@ data class ServerStatus(
     val port: Int,
     val watchedObjectCount: Int,
     val retainedObjectCount: Int,
+    /** Memory sampled every second for the live chart; turned on and off from the web UI. */
+    val liveMemoryEnabled: Boolean = false,
 )
 
 /** An object retained in memory that was not analyzed yet (`GET /api/retained`). */

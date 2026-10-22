@@ -7,6 +7,8 @@ import android.os.Debug
 import io.github.rogerphilippe.leakweb.model.MemorySample
 import io.github.rogerphilippe.leakweb.watcher.Clock
 import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
+import java.io.File
+import java.util.concurrent.Future
 
 /** Reads the memory counters of the process. */
 internal interface MemoryReader {
@@ -37,7 +39,7 @@ internal class AndroidMemoryReader(
 }
 
 /**
- * Takes a [MemorySample] on each [sample] call (scheduled every second by the runtime), keeps the last
+ * Takes a [MemorySample] on each [sample] call (every second while [LiveMemory] is on), keeps the last
  * [historySize] ones for the chart of the web UI and passes each one to [onSample].
  * PSS is read only every [pssIntervalMillis]; the samples in between repeat the last value.
  */
@@ -56,8 +58,16 @@ internal class MemorySampler(
     val history: List<MemorySample>
         @Synchronized get() = samples.toList()
 
-    /** The last sample, or a new one if none was taken yet. */
-    fun latest(): MemorySample = synchronized(this) { samples.lastOrNull() } ?: sample()
+    /** Reads the memory now, PSS included, without adding it to the history. */
+    fun snapshot(): MemorySample = reader.read().copy(pssKb = reader.readPssKb())
+
+    /** Forgets the history and reads PSS again on the next sample. */
+    @Synchronized
+    fun clear() {
+        samples.clear()
+        lastPssKb = null
+        lastPssUptimeMillis = null
+    }
 
     fun sample(): MemorySample {
         val sample =
@@ -83,5 +93,62 @@ internal class MemorySampler(
 
         // Five minutes at one sample per second.
         private const val DEFAULT_HISTORY_SIZE = 300
+    }
+}
+
+/** Runs [command] every [intervalMillis] on a background thread until the returned future is cancelled. */
+internal fun interface RepeatingExecutor {
+    fun scheduleRepeating(
+        intervalMillis: Long,
+        command: Runnable,
+    ): Future<*>
+}
+
+/**
+ * Live memory sampling, off by default. Only the web UI turns it on or off, and it stays so until
+ * turned again, even across app restarts ([stateFile] exists while it is on). Turning it on clears
+ * the history; while it is off nothing is sampled at all.
+ */
+internal class LiveMemory(
+    val sampler: MemorySampler,
+    private val stateFile: File,
+    private val executor: RepeatingExecutor,
+    private val onChanged: (enabled: Boolean) -> Unit,
+) {
+    private var sampling: Future<*>? = null
+
+    val isEnabled: Boolean
+        @Synchronized get() = sampling != null
+
+    /** Turns sampling back on if it was on when the app last stopped. */
+    fun restore() {
+        if (stateFile.isFile) setEnabled(true)
+    }
+
+    @Synchronized
+    fun setEnabled(enabled: Boolean) {
+        if (enabled == isEnabled) return
+        if (enabled) {
+            sampler.clear()
+            // An exception would cancel the next runs.
+            sampling =
+                executor.scheduleRepeating(MemorySampler.SAMPLE_INTERVAL_MILLIS) { runCatching { sampler.sample() } }
+        } else {
+            sampling?.cancel(false)
+            sampling = null
+        }
+        saveState(enabled)
+        onChanged(enabled)
+    }
+
+    private fun saveState(enabled: Boolean) {
+        runCatching {
+            if (enabled) {
+                stateFile.parentFile?.mkdirs()
+                stateFile.writeText("on")
+            } else {
+                stateFile.delete()
+            }
+        }
     }
 }

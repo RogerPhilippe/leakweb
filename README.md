@@ -160,8 +160,11 @@ and leaves that watcher off; the rest keeps working. To avoid them, leave the ty
 
 ### Live memory
 
-The Memory section of the web UI shows the Java heap, the native heap and the PSS of the app process,
-sampled every second (PSS every 10 seconds, it is slower to read), with a chart of the last 5 minutes.
+The Memory section of the web UI shows the Java heap, the native heap and the PSS of the app process.
+Live monitoring is **off by default**: the section then shows the values read when it opens, and
+nothing is sampled. "Start live monitoring" samples every second (PSS every 10 seconds, it is slower to
+read) with a chart of the last 5 minutes. It keeps running in the app, even with the page closed or
+after an app restart, until "Stop live monitoring"; starting it again clears the chart.
 
 ### HTTP API
 
@@ -184,8 +187,10 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/leaks
 | POST | `/api/heapdump` | Dumps and analyzes the heap now |
 | POST | `/api/gc` | Runs the garbage collector |
 | GET | `/api/memory` | Current memory usage |
-| GET | `/api/memory/history` | Memory samples of the last 5 minutes, oldest first |
-| GET | `/api/events` | Server-Sent Events: memory samples, retained objects, heap dumps, analysis progress, new leaks |
+| GET | `/api/memory/history` | Memory samples since live monitoring was started (5 minutes at most), oldest first |
+| POST | `/api/memory/live/start` | Starts live memory monitoring (clears the history) |
+| POST | `/api/memory/live/stop` | Stops live memory monitoring |
+| GET | `/api/events` | Server-Sent Events: memory samples, live monitoring on/off, retained objects, heap dumps, analysis progress, new leaks |
 
 Responses are wrapped as `{"schemaVersion": 1, "data": ...}`; errors as
 `{"schemaVersion": 1, "error": {"status": 404, "message": "..."}}`.

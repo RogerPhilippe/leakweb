@@ -71,6 +71,14 @@ internal class ApiRoutes(
         router.get("/api/memory/history") {
             jsonResponse(ListSerializer(MemorySample.serializer()), commands.memoryHistory())
         }
+        router.post("/api/memory/live/start") {
+            commands.setLiveMemory(true)
+            jsonResponse(CommandResult.serializer(), CommandResult(accepted = true, message = "Live memory started"))
+        }
+        router.post("/api/memory/live/stop") {
+            commands.setLiveMemory(false)
+            jsonResponse(CommandResult.serializer(), CommandResult(accepted = true, message = "Live memory stopped"))
+        }
         router.get("/api/events") {
             HttpResponse(
                 status = HttpStatus.OK,

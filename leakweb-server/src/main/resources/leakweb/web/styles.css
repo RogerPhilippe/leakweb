@@ -137,19 +137,39 @@ button.danger {
   white-space: nowrap;
 }
 
-.live {
-  display: flex;
+/* lw-dump-button: the button, or the progress of the dump and its analysis */
+
+.dump-progress {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  max-width: 260px;
   font-size: 0.85rem;
+
+  progress {
+    width: 90px;
+    flex: none;
+  }
 }
 
-.live[hidden] {
+.dump-progress-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 0.35rem;
+  border-radius: 50%;
+  background: var(--ok);
+  vertical-align: 0.1em;
+}
+
+.live-dot[hidden] {
   display: none;
-}
-
-.live progress {
-  width: 120px;
 }
 
 .actions {
@@ -554,6 +574,34 @@ a.card:hover {
 
 .memory-card meter {
   width: 100%;
+}
+
+.view-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+
+  h1 {
+    margin-bottom: 0;
+  }
+}
+
+.live-state {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+
+  &.on {
+    background: color-mix(in srgb, var(--ok) 14%, transparent);
+  }
+}
+
+.chart-card[hidden] {
+  display: none;
 }
 
 /* Memory chart (lw-memory-chart) */

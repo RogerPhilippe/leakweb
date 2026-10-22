@@ -127,6 +127,17 @@ class LeakWebHttpHandlerTest {
     }
 
     @Test
+    fun `starts and stops live memory`() {
+        val handler = handler()
+
+        fun post(path: String) = handler.handle(request(path, HttpMethod.POST, headers = mapOf(TOKEN_HEADER))).status
+
+        assertEquals(200, post("/api/memory/live/start"))
+        assertEquals(200, post("/api/memory/live/stop"))
+        assertEquals(listOf(true, false), commands.liveMemoryChanges)
+    }
+
+    @Test
     fun `wraps API responses with the schema version`() {
         val response = get("/api/status")
 

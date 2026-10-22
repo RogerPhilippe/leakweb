@@ -3,7 +3,12 @@
  */
 package io.github.rogerphilippe.leakweb.internal
 
+import io.github.rogerphilippe.leakweb.model.Event
 import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,6 +18,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HeapDumpTriggerTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
@@ -49,6 +55,7 @@ class HeapDumpTriggerTest {
             visibleThreshold = { visibleThreshold },
             backgroundThreshold = 1,
             waitBetweenDumpsMillis = 60_000L,
+            manualDumpDelayMillis = 300L,
             newId = { "dump-${heapDumps.size + dumpedFiles.size}" },
         )
     }
@@ -132,6 +139,14 @@ class HeapDumpTriggerTest {
     }
 
     @Test
+    fun `manual dump starts after a short delay, so the response is sent before the app freezes`() {
+        trigger.requestManualDump()
+
+        assertEquals(listOf(300L), runScheduled())
+        assertEquals(1, heapDumps.size)
+    }
+
+    @Test
     fun `a pending manual dump is not requested twice`() {
         assertTrue(trigger.requestManualDump())
         assertFalse(trigger.requestManualDump())
@@ -184,4 +199,20 @@ class HeapDumpTriggerTest {
         assertEquals(3, objectWatcher.retainedObjectCount)
         assertFalse(store.newHeapDumpFile("dump-0").exists())
     }
+
+    @Test
+    fun `failed dump is reported to the web UI`() =
+        runTest {
+            val received = mutableListOf<Event>()
+            backgroundScope.launch(
+                UnconfinedTestDispatcher(testScheduler),
+            ) { eventBus.events.collect { received += it } }
+            retain(3)
+            dumpFails = true
+
+            trigger.onObjectRetained()
+            runScheduled()
+
+            assertEquals(Event.HeapDumpFailed("disk full"), received.last())
+        }
 }

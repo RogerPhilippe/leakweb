@@ -2,18 +2,18 @@
 
 import { api } from './api.js';
 import './components.js';
+import { dumpProgress } from './dump-progress.js';
 import { message, render } from './dom.js';
 import { analysesView, leakDetailView, leaksView, memoryView, retainedView } from './views.js';
 
-const ANALYSIS_STEPS = 10;
 const RECONNECT_DELAY_MILLIS = 5000;
+// A lost end event (e.g. the connection dropped while the app was frozen) must not hide the dump buttons forever.
+const DUMP_WATCHDOG_MILLIS = 3 * 60 * 1000;
 const THEMES = ['auto', 'light', 'dark'];
 
 const view = document.getElementById('view');
 const toasts = document.querySelector('lw-toasts');
-const live = document.getElementById('live');
-const liveLabel = document.getElementById('live-label');
-const liveProgress = document.getElementById('live-progress');
+const memoryLive = document.getElementById('memory-live');
 const connection = document.getElementById('connection');
 const retainedCount = document.getElementById('retained-count');
 const leakCount = document.getElementById('leak-count');
@@ -21,7 +21,7 @@ const leakCount = document.getElementById('leak-count');
 const routes = [
   { pattern: /^#\/leaks\/([A-Za-z0-9_-]+)$/, section: 'leaks', show: (params) => leakDetailView(view, params[0]) },
   { pattern: /^#\/leaks$/, section: 'leaks', show: () => leaksView(view) },
-  { pattern: /^#\/retained$/, section: 'retained', show: () => retainedView(view, { onDumpHeap: dumpHeap }) },
+  { pattern: /^#\/retained$/, section: 'retained', show: () => retainedView(view) },
   { pattern: /^#\/memory$/, section: 'memory', show: () => memoryView(view) },
   { pattern: /^#\/analyses$/, section: 'analyses', show: () => analysesView(view, { onChanged: refresh }) },
 ];
@@ -71,6 +71,7 @@ async function updateCounters() {
     document.title = `LeakWeb · ${status.appPackage}`;
     setBadge(retainedCount, status.retainedObjectCount);
     setBadge(leakCount, leaks.length);
+    memoryLive.hidden = !status.liveMemoryEnabled;
   } catch {
     // The unauthorized handler or the view shows the error.
   }
@@ -80,11 +81,25 @@ function setBadge(badge, count) {
   badge.textContent = count > 0 ? String(count) : '';
 }
 
+let dumpWatchdog = null;
+
+function setDumpProgress(state) {
+  clearTimeout(dumpWatchdog);
+  if (state) dumpWatchdog = setTimeout(() => dumpProgress.reset(), DUMP_WATCHDOG_MILLIS);
+  if (state) dumpProgress.set(state);
+  else dumpProgress.reset();
+}
+
 async function dumpHeap() {
+  if (!dumpProgress.isIdle()) return;
+  // Shown right away: the app freezes during the dump and cannot report anything until it ends.
+  setDumpProgress({ phase: 'dumping' });
   try {
     const result = await api.heapDump();
-    toasts.show(result.accepted ? 'Heap dump requested' : result.message);
+    // Not accepted: a requested dump is about to start, so the progress stays.
+    if (!result.accepted) toasts.show(result.message);
   } catch (error) {
+    setDumpProgress(null);
     toasts.show(error.message, { kind: 'error' });
   }
 }
@@ -97,13 +112,6 @@ async function runGc() {
   } catch (error) {
     toasts.show(error.message, { kind: 'error' });
   }
-}
-
-function showProgress(label, percent) {
-  live.hidden = false;
-  liveLabel.textContent = label;
-  if (percent === null) liveProgress.removeAttribute('value');
-  else liveProgress.value = percent;
 }
 
 function connectEvents() {
@@ -122,18 +130,25 @@ function connectEvents() {
   });
   // Views that show live memory listen to this DOM event.
   on('memory.sample', (data) => document.dispatchEvent(new CustomEvent('leakweb:memory-sample', { detail: data.sample })));
-  on('heapdump.started', () => showProgress('Dumping heap…', null));
+  on('memory.live', (data) => {
+    memoryLive.hidden = !data.enabled;
+    document.dispatchEvent(new CustomEvent('leakweb:memory-live', { detail: data.enabled }));
+  });
+  on('heapdump.started', () => setDumpProgress({ phase: 'dumping' }));
+  on('heapdump.failed', (data) => {
+    setDumpProgress(null);
+    toasts.show(`Heap dump failed: ${data.message}`, { kind: 'error' });
+  });
   on('analysis.progress', (data) => {
     // The dump is written: the objects it holds are no longer watched.
     if (data.step === 'PARSING_HEAP_DUMP') {
       updateCounters();
       if (location.hash === '#/retained') showRoute();
     }
-    const step = data.step.toLowerCase().replaceAll('_', ' ');
-    showProgress(`Analyzing: ${step}`, data.percent ?? (100 / ANALYSIS_STEPS));
+    setDumpProgress({ phase: 'analyzing', step: data.step, percent: data.percent });
   });
   on('analysis.done', (data) => {
-    live.hidden = true;
+    setDumpProgress(null);
     if (!data.success) toasts.show('Heap analysis failed, see Analyses', { href: '#/analyses', kind: 'error' });
     refresh();
   });
@@ -178,7 +193,7 @@ document.addEventListener('leakweb:unauthorized', () => {
   render(view, message('Session expired or invalid token. Open the URL with the token printed in logcat (tag LeakWeb).', 'error'));
 });
 document.getElementById('gc-button').addEventListener('click', runGc);
-document.getElementById('dump-button').addEventListener('click', dumpHeap);
+document.addEventListener('leakweb:dump-request', dumpHeap);
 window.addEventListener('hashchange', showRoute);
 
 setupTheme();

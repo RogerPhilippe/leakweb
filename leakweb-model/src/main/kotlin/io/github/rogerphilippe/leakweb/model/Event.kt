@@ -15,6 +15,13 @@ sealed interface Event {
         val sample: MemorySample,
     ) : Event
 
+    /** Live memory sampling was turned on or off, maybe from another tab. */
+    @Serializable
+    @SerialName("memory.live")
+    data class LiveMemoryChanged(
+        val enabled: Boolean,
+    ) : Event
+
     @Serializable
     @SerialName("object.retained")
     data class ObjectRetained(
@@ -28,6 +35,12 @@ sealed interface Event {
     @SerialName("heapdump.started")
     data class HeapDumpStarted(
         val retainedObjectCount: Int,
+    ) : Event
+
+    @Serializable
+    @SerialName("heapdump.failed")
+    data class HeapDumpFailed(
+        val message: String,
     ) : Event
 
     @Serializable

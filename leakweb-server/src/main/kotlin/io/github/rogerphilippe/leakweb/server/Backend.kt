@@ -35,10 +35,14 @@ interface Commands {
 
     fun retainedObjects(): List<RetainedObjectInfo>
 
+    /** Reads the memory now, whether live sampling is on or not. */
     fun memory(): MemorySample
 
-    /** Recent samples, oldest first; the next ones arrive as `memory.sample` events. */
+    /** Samples since live sampling was last turned on (5 minutes at most), oldest first. */
     fun memoryHistory(): List<MemorySample>
+
+    /** Turns live sampling on (clearing the history) or off; it stays so until turned again, across app restarts. */
+    fun setLiveMemory(enabled: Boolean)
 
     /** Starts a heap dump in the background, ignoring the retained threshold; false if one is running. */
     fun requestHeapDump(): Boolean

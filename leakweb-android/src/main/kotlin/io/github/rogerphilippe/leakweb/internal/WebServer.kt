@@ -149,6 +149,7 @@ internal class AndroidCommands(
             port = -1,
             watchedObjectCount = objectWatcher.watchedObjectCount,
             retainedObjectCount = objectWatcher.retainedObjectCount,
+            liveMemoryEnabled = runtime.liveMemory.isEnabled,
         )
 
     override fun retainedObjects() =
@@ -156,9 +157,11 @@ internal class AndroidCommands(
             RetainedObjectInfo(it.key, it.description, it.className, it.watchUptimeMillis, it.retainedUptimeMillis)
         }
 
-    override fun memory() = runtime.memorySampler.latest()
+    override fun memory() = runtime.liveMemory.sampler.snapshot()
 
-    override fun memoryHistory() = runtime.memorySampler.history
+    override fun memoryHistory() = runtime.liveMemory.sampler.history
+
+    override fun setLiveMemory(enabled: Boolean) = runtime.liveMemory.setEnabled(enabled)
 
     override fun requestHeapDump() = runtime.heapDumpTrigger.requestManualDump()
 

@@ -15,14 +15,10 @@
       <span>LeakWeb</span>
     </a>
     <span class="app-name" id="app-name"></span>
-    <div class="live" id="live" hidden>
-      <span class="live-label" id="live-label"></span>
-      <progress id="live-progress" max="100"></progress>
-    </div>
     <div class="actions">
       <span class="connection" id="connection" title="Connection to the app (events)">Connecting</span>
       <button type="button" id="gc-button">Run GC</button>
-      <button type="button" id="dump-button" class="primary">Dump heap</button>
+      <lw-dump-button label="Dump heap"></lw-dump-button>
       <button type="button" id="theme-button" class="icon-button" title="Theme">◐</button>
     </div>
   </header>
@@ -30,7 +26,7 @@
   <nav class="sidebar" aria-label="Sections">
     <a href="#/leaks" data-section="leaks">Leaks <span class="badge" id="leak-count"></span></a>
     <a href="#/retained" data-section="retained">Retained <span class="badge" id="retained-count"></span></a>
-    <a href="#/memory" data-section="memory">Memory</a>
+    <a href="#/memory" data-section="memory">Memory <span class="live-dot" id="memory-live" title="Live monitoring is on" hidden></span></a>
     <a href="#/analyses" data-section="analyses">Analyses</a>
   </nav>
 

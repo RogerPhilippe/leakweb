@@ -73,6 +73,12 @@ internal class FakeCommands : Commands {
 
     override fun memoryHistory() = listOf(MemorySample(0, 1, 3, 4, 500, 3, 1), memory())
 
+    val liveMemoryChanges = mutableListOf<Boolean>()
+
+    override fun setLiveMemory(enabled: Boolean) {
+        liveMemoryChanges += enabled
+    }
+
     override fun requestHeapDump(): Boolean {
         heapDumpRequests++
         return true
