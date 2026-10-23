@@ -1,8 +1,10 @@
 /*
  * Copyright (c) 2026 Roger Philippe
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 import com.android.build.api.dsl.LibraryExtension
 import io.github.rogerphilippe.leakweb.buildlogic.addUnitTestDependencies
+import io.github.rogerphilippe.leakweb.buildlogic.configurePublishing
 import io.github.rogerphilippe.leakweb.buildlogic.configureQuality
 import io.github.rogerphilippe.leakweb.buildlogic.javaVersion
 import io.github.rogerphilippe.leakweb.buildlogic.libs
@@ -27,10 +29,14 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                     sourceCompatibility = javaVersion
                     targetCompatibility = javaVersion
                 }
+                publishing {
+                    singleVariant("release") { withSourcesJar() }
+                }
             }
 
             addUnitTestDependencies()
             configureQuality()
+            configurePublishing(component = "release")
         }
     }
 }

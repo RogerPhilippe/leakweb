@@ -1,0 +1,80 @@
+public final class io/github/rogerphilippe/leakweb/BindAddress : java/lang/Enum {
+	public static final field AllInterfaces Lio/github/rogerphilippe/leakweb/BindAddress;
+	public static final field Loopback Lio/github/rogerphilippe/leakweb/BindAddress;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/rogerphilippe/leakweb/BindAddress;
+	public static fun values ()[Lio/github/rogerphilippe/leakweb/BindAddress;
+}
+
+public final class io/github/rogerphilippe/leakweb/LeakWebConfig {
+	public static final field Companion Lio/github/rogerphilippe/leakweb/LeakWebConfig$Companion;
+	public static final field DEFAULT_PORT I
+	public static final field DEFAULT_RETAINED_THRESHOLD I
+	public fun <init> ()V
+	public fun <init> (IZLio/github/rogerphilippe/leakweb/BindAddress;Ljava/lang/String;ZZIZLjava/util/Set;)V
+	public synthetic fun <init> (IZLio/github/rogerphilippe/leakweb/BindAddress;Ljava/lang/String;ZZIZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun component3 ()Lio/github/rogerphilippe/leakweb/BindAddress;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()I
+	public final fun component8 ()Z
+	public final fun component9 ()Ljava/util/Set;
+	public final fun copy (IZLio/github/rogerphilippe/leakweb/BindAddress;Ljava/lang/String;ZZIZLjava/util/Set;)Lio/github/rogerphilippe/leakweb/LeakWebConfig;
+	public static synthetic fun copy$default (Lio/github/rogerphilippe/leakweb/LeakWebConfig;IZLio/github/rogerphilippe/leakweb/BindAddress;Ljava/lang/String;ZZIZLjava/util/Set;ILjava/lang/Object;)Lio/github/rogerphilippe/leakweb/LeakWebConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBindAddress ()Lio/github/rogerphilippe/leakweb/BindAddress;
+	public final fun getLogStartup ()Z
+	public final fun getPersistToken ()Z
+	public final fun getPersistentNotification ()Z
+	public final fun getPort ()I
+	public final fun getPortFallback ()Z
+	public final fun getRetainedThreshold ()I
+	public final fun getToken ()Ljava/lang/String;
+	public final fun getWatchers ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/rogerphilippe/leakweb/LeakWebConfig$Companion {
+}
+
+public final class io/github/rogerphilippe/leakweb/LeakWebSession {
+	public static final field Companion Lio/github/rogerphilippe/leakweb/LeakWebSession$Companion;
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;ILjava/lang/String;)Lio/github/rogerphilippe/leakweb/LeakWebSession;
+	public static synthetic fun copy$default (Lio/github/rogerphilippe/leakweb/LeakWebSession;Ljava/lang/String;ILjava/lang/String;ILjava/lang/Object;)Lio/github/rogerphilippe/leakweb/LeakWebSession;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPort ()I
+	public final fun getToken ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isRunning ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/rogerphilippe/leakweb/LeakWebSession$Companion {
+	public final fun getNOT_RUNNING ()Lio/github/rogerphilippe/leakweb/LeakWebSession;
+}
+
+public final class io/github/rogerphilippe/leakweb/WatcherType : java/lang/Enum {
+	public static final field ACTIVITY Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static final field Companion Lio/github/rogerphilippe/leakweb/WatcherType$Companion;
+	public static final field FRAGMENT Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static final field FRAGMENT_VIEW Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static final field SERVICE Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static final field VIEW_MODEL Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/rogerphilippe/leakweb/WatcherType;
+	public static fun values ()[Lio/github/rogerphilippe/leakweb/WatcherType;
+}
+
+public final class io/github/rogerphilippe/leakweb/WatcherType$Companion {
+	public final fun getDefaults ()Ljava/util/Set;
+}
+

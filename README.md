@@ -1,3 +1,5 @@
+[English](README.md) · [Português (BR)](README.pt-BR.md) · [Español](README.es.md)
+
 # LeakWeb
 
 > Work in progress. Provisional name.
@@ -185,7 +187,7 @@ The web UI uses a JSON API that you can also call from scripts. Send the token a
 `Authorization: Bearer <token>` or `X-LeakWeb-Token: <token>`:
 
 ```sh
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/leaks
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/leaks
 ```
 
 | Method | Route | Description |
@@ -231,6 +233,54 @@ Requirements: Android SDK and JDK 17+ (the Gradle daemon and toolchains are prov
 ./gradlew spotlessApply  # format code and add the copyright header
 ```
 
+## Security
+
+- Never ship `leakweb-android` in a release build. Use `debugImplementation` and, if your code calls
+  the API, `releaseImplementation` of `leakweb-noop`.
+- Heap dumps contain **everything that is in memory** (tokens, personal data). Treat `.hprof` files
+  as sensitive and do not share them.
+- The server listens on loopback only by default, and every request needs the session token, even on
+  loopback, since any app on the device can reach `127.0.0.1`. The token is not persisted unless you
+  ask for it.
+- `Host` and `Origin` headers are validated (DNS rebinding protection) and the web UI uses a
+  restrictive `Content-Security-Policy`.
+- `BindAddress.AllInterfaces` exposes the server to the local network: use it only on trusted networks.
+
+## FAQ
+
+**Does it work in release builds?** No, by design. `leakweb-noop` has the same API with an empty
+implementation, so the same code compiles in both builds.
+
+**Which Android versions are supported?** `minSdk` 23. The ViewModel and Service watchers use
+internals that may change; if one stops working, LeakWeb logs a warning and keeps the others running.
+
+**How is it different from LeakCanary?** LeakCanary shows leaks on the device. LeakWeb serves the
+same kind of analysis (also built on Shark) as a web UI in your desktop browser, with live memory
+and `.hprof` download.
+
+**The page says unauthorized.** Open the URL with the token printed in logcat (tag `LeakWeb`); a
+new token is generated every time the app starts, unless you set `token` or `persistToken`.
+
+**A heap dump failed.** Open the failed analysis in the web UI to see the stack trace and
+[open an issue](https://github.com/RogerPhilippe/leakweb/issues) with it.
+
 ## License
 
-Not defined yet. All rights reserved until a license is chosen.
+LeakWeb is distributed under a **dual license**:
+
+- [AGPLv3](LICENSE) — free, as long as any modified version (including use
+  as a network service) is also made available under the same license.
+- [Commercial license](COMMERCIAL-LICENSE.md) — a safeguard, not a product:
+  selling LeakWeb or using it in closed-source software requires the
+  maintainer's explicit permission.
+
+LeakWeb is a debugging tool for debug builds. Using the unmodified library in debug builds that stay
+inside your team does not distribute it; see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for what
+counts as distribution.
+
+Contributions are subject to the terms in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Third-party dependencies keep their own licenses (Apache-2.0, BSD, MIT), all compatible with both
+license options.
+
+Copyright © 2026 Roger Philippe Pereira

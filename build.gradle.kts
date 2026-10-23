@@ -8,4 +8,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.binary.compatibility.validator)
+}
+
+// Only the modules that make up the public API are validated; the others are implementation details.
+apiValidation {
+    ignoredProjects.addAll(
+        listOf("leakweb-model", "leakweb-watcher", "leakweb-analyzer", "leakweb-server", "sample"),
+    )
 }

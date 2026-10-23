@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2026 Roger Philippe
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 import com.android.build.api.dsl.ApplicationExtension
 import io.github.rogerphilippe.leakweb.buildlogic.addUnitTestDependencies

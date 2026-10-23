@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Commercial license
+    url: https://github.com/RogerPhilippe/leakweb/blob/main/COMMERCIAL-LICENSE.md
+    about: Questions about using LeakWeb outside the AGPLv3 terms

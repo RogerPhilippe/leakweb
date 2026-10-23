@@ -17,6 +17,7 @@ androidxStartup = "1.2.0"
 androidxFragment = "1.9.1"
 kotlinxCoroutines = "1.10.2"
 nanohttpd = "2.3.1"
+binaryCompatibilityValidator = "0.18.1"
 
 # Build configuration shared by the convention plugins
 compileSdk = "37"
@@ -63,6 +64,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binaryCompatibilityValidator" }
 
 # Convention plugins (build-logic)
 leakweb-jvm-library = { id = "leakweb.jvm.library" }

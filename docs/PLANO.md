@@ -53,7 +53,7 @@ Se código do LeakCanary for copiado/adaptado, manter o aviso de copyright e o `
 | Inicialização | Automática via `androidx.startup` **ou** manual com `LeakWeb.start(app, config)` no `Application` | Zero config por padrão; controle de porta e acesso ao token quando preciso (ver seção 4.1) |
 | Autenticação | Token aleatório obrigatório em todas as rotas, devolvido por `start()` | Heap dump expõe qualquer dado em memória; outro app no aparelho também alcança `127.0.0.1` |
 | Concorrência | Coroutines, dispatcher próprio para análise | — |
-| Licença | **Em aberto.** Provável licença dupla: AGPLv3 + comercial | Dependências (Shark: Apache 2.0, NanoHTTPD: BSD-3, kotlinx: Apache 2.0) são compatíveis com AGPLv3. Ver seção 7.1 |
+| Licença | **Definida:** licença dupla AGPLv3 + comercial | Dependências (Shark: Apache 2.0, NanoHTTPD: BSD-3, kotlinx: Apache 2.0) são compatíveis com AGPLv3. Ver seção 7.1 |
 | Publicação | JitPack no início, Maven Central depois | — |
 | minSdk | 23 | Libs AndroidX recentes já exigem 23 |
 | Processos | Só o processo principal inicia watchers e servidor | `Application.onCreate` e `androidx.startup` rodam em todos os processos do app |
@@ -338,13 +338,13 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 - [x] Teste instrumentado end-to-end no `sample` (Activity destruída retida → heap analisado → vazamento listado).
 
 ### Fase 8 — Open source
-- [ ] Teste de compatibilidade de assinatura entre `leakweb-android` e `leakweb-noop` (o noop já existe desde a Fase 4).
-- [ ] README com GIF, instalação, como acessar, segurança, FAQ.
-- [ ] Definir a licença (ver seção 7.1), adicionar `LICENSE` e identificador SPDX nos cabeçalhos.
-- [ ] `CONTRIBUTING.md`, templates de issue/PR, `CHANGELOG.md`.
-- [ ] Se for licença dupla: CLA para contribuidores (ex.: CLA Assistant no GitHub) **antes** de aceitar o primeiro PR externo.
-- [ ] Publicação (JitPack → Maven Central), versionamento semântico.
-- [ ] Binary compatibility validator (`kotlinx-binary-compatibility-validator`) nos módulos públicos.
+- [x] Teste de compatibilidade de assinatura entre `leakweb-android` e `leakweb-noop` (`ApiCompatibilityTest`, em `leakweb-noop`).
+- [ ] README com GIF, instalação, como acessar, segurança, FAQ. README em inglês, português e espanhol, com segurança e FAQ; falta o GIF.
+- [x] Definir a licença (ver seção 7.1), adicionar `LICENSE` e identificador SPDX nos cabeçalhos. Licença dupla AGPLv3 + comercial (`COMMERCIAL-LICENSE*.md`), `SPDX-License-Identifier: AGPL-3.0-or-later` nos cabeçalhos.
+- [x] `CONTRIBUTING.md` (en, pt-BR, es), templates de issue/PR, `CHANGELOG.md`.
+- [x] Se for licença dupla: CLA para contribuidores **antes** de aceitar o primeiro PR externo. Contributor Agreement no `CONTRIBUTING*.md`, confirmado no template de PR.
+- [ ] Publicação (JitPack → Maven Central), versionamento semântico. `maven-publish` e `jitpack.yml` configurados; falta publicar a primeira versão (JitPack não verificado) e o Maven Central.
+- [x] Binary compatibility validator (`kotlinx-binary-compatibility-validator`) nos módulos públicos. Valida `leakweb-api`; a versão atual não suporta bibliotecas Android com o AGP 9, então `leakweb-android` e `leakweb-noop` ficam cobertos pelo teste de compatibilidade acima.
 
 ---
 
@@ -360,7 +360,7 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
 - Parâmetros de rota validados por formato; ids nunca viram caminho de arquivo diretamente.
 - UI com `Content-Security-Policy` restritivo e strings do heap renderizadas só como texto.
 
-### 7.1 Licenciamento (em aberto)
+### 7.1 Licenciamento (decidido: licença dupla)
 
 Direção atual: **licença dupla**, AGPLv3 para uso aberto + licença comercial para quem quiser comercializar a lib ou não puder cumprir a AGPL.
 
