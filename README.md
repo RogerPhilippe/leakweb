@@ -1,5 +1,7 @@
 [English](README.md) · [Português (BR)](README.pt-BR.md) · [Español](README.es.md)
 
+[![](https://jitpack.io/v/RogerPhilippe/leakweb.svg)](https://jitpack.io/#RogerPhilippe/leakweb)
+
 # LeakWeb
 
 Android library (Kotlin) that detects memory leaks and lets you inspect the app's memory from a
@@ -14,15 +16,27 @@ Android library (Kotlin) that detects memory leaks and lets you inspect the app'
 
 ## Installation
 
-> Not published yet. Coordinates below are the planned ones.
+Published on [JitPack](https://jitpack.io/#RogerPhilippe/leakweb). Add the repository in `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+Then the dependencies (use the latest version shown in the badge above):
 
 ```kotlin
 dependencies {
     // The library: watchers, heap analysis and the embedded web server. Debug builds only.
-    debugImplementation("io.github.rogerphilippe:leakweb-android:<version>")
+    debugImplementation("com.github.RogerPhilippe.leakweb:leakweb-android:<version>")
 
     // Optional: only needed if your code calls the LeakWeb API (see below).
-    releaseImplementation("io.github.rogerphilippe:leakweb-noop:<version>")
+    releaseImplementation("com.github.RogerPhilippe.leakweb:leakweb-noop:<version>")
 }
 ```
 

@@ -1,5 +1,7 @@
 [English](README.md) · [Português (BR)](README.pt-BR.md) · [Español](README.es.md)
 
+[![](https://jitpack.io/v/RogerPhilippe/leakweb.svg)](https://jitpack.io/#RogerPhilippe/leakweb)
+
 # LeakWeb
 
 Biblioteca Android (Kotlin) que detecta fugas de memoria y permite inspeccionar la memoria de la app desde una
@@ -14,15 +16,27 @@ Biblioteca Android (Kotlin) que detecta fugas de memoria y permite inspeccionar 
 
 ## Instalación
 
-> Aún no publicado. Las coordenadas de abajo son las planificadas.
+Publicado en [JitPack](https://jitpack.io/#RogerPhilippe/leakweb). Agregue el repositorio en `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+Luego las dependencias (use la última versión indicada en el badge de arriba):
 
 ```kotlin
 dependencies {
     // La biblioteca: watchers, análisis de heap y el servidor web integrado. Solo builds debug.
-    debugImplementation("io.github.rogerphilippe:leakweb-android:<version>")
+    debugImplementation("com.github.RogerPhilippe.leakweb:leakweb-android:<version>")
 
     // Opcional: solo es necesario si su código llama a la API de LeakWeb (vea abajo).
-    releaseImplementation("io.github.rogerphilippe:leakweb-noop:<version>")
+    releaseImplementation("com.github.RogerPhilippe.leakweb:leakweb-noop:<version>")
 }
 ```
 
