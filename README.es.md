@@ -2,8 +2,6 @@
 
 # LeakWeb
 
-> En desarrollo. Nombre provisional.
-
 Biblioteca Android (Kotlin) que detecta fugas de memoria y permite inspeccionar la memoria de la app desde una
 **interfaz web**, servida por un servidor HTTP integrado en el build debug de su app.
 
@@ -13,8 +11,6 @@ Biblioteca Android (Kotlin) que detecta fugas de memoria y permite inspeccionar 
 - Interfaz web en el navegador del computador (mediante `adb forward`), protegida por token.
 - Uso de memoria en vivo, historial de fugas y descarga del `.hprof`.
 - Módulo no-op con la misma API pública para builds de release.
-
-El plan de desarrollo está en [docs/PLANO.md](docs/PLANO.md).
 
 ## Instalación
 

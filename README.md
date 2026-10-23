@@ -2,8 +2,6 @@
 
 # LeakWeb
 
-> Work in progress. Provisional name.
-
 Android library (Kotlin) that detects memory leaks and lets you inspect the app's memory from a
 **web interface**, served by an HTTP server embedded in the debug build of your app.
 
@@ -13,8 +11,6 @@ Android library (Kotlin) that detects memory leaks and lets you inspect the app'
 - Web UI in the desktop browser (via `adb forward`), protected by a token.
 - Live memory usage, leak history and `.hprof` download.
 - No-op module with the same public API for release builds.
-
-The development plan is in [docs/PLANO.md](docs/PLANO.md).
 
 ## Installation
 
