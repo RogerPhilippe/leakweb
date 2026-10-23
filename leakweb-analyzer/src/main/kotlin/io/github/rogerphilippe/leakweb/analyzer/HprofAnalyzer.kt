@@ -127,7 +127,7 @@ class HprofAnalyzer internal constructor(
 
     // Finding the unwatched objects scans every object of the heap, which makes the analysis slower.
     private fun HeapGraph.leakingObjectFinder(): LeakingObjectFinder {
-        val unwatchedFinder = FilteringLeakingObjectFinder(unwatchedLeakFilters(this))
+        val unwatchedFinder = FilteringLeakingObjectFinder(unwatchedLeakFilters(this).map(::tolerant))
         return LeakingObjectFinder { graph ->
             KeyedWeakReferenceFinder().findLeakingObjectIds(graph) + unwatchedFinder.findLeakingObjectIds(graph)
         }
@@ -141,6 +141,18 @@ class HprofAnalyzer internal constructor(
         }
 
     private companion object {
+        // Shark's Android filters assume fields that some heaps lack (e.g. Toast without mTN) and throw
+        // a NullPointerException; that must only skip the filter for that object, not fail the analysis.
+        @Suppress("TooGenericExceptionCaught")
+        fun tolerant(filter: LeakingObjectFilter) =
+            LeakingObjectFilter { heapObject ->
+                try {
+                    filter.isLeakingObject(heapObject)
+                } catch (_: Exception) {
+                    false
+                }
+            }
+
         fun HeapGraph.leakingObjectFilters(): List<LeakingObjectFilter> =
             if (isAndroidHeap()) {
                 AndroidObjectInspectors.appLeakingObjectFilters

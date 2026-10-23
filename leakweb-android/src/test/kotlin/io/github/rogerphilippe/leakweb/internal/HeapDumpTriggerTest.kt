@@ -27,6 +27,7 @@ class HeapDumpTriggerTest {
     private var visible = true
     private var visibleThreshold = 3
     private var dumpFails = false
+    private var insufficientSpace: String? = null
     private val scheduled = mutableListOf<Pair<Long, Runnable>>()
     private val dumpedFiles = mutableListOf<File>()
     private val heapDumps = mutableListOf<HeapDump>()
@@ -45,7 +46,10 @@ class HeapDumpTriggerTest {
             isAppVisible = { visible },
             executor = { delayMillis, command -> scheduled += delayMillis to command },
             heapDumper = { file ->
-                if (dumpFails) throw IOException("disk full")
+                if (dumpFails) {
+                    file.writeText("partial")
+                    throw IOException("disk full")
+                }
                 file.writeText("hprof")
                 dumpedFiles += file
             },
@@ -57,6 +61,7 @@ class HeapDumpTriggerTest {
             waitBetweenDumpsMillis = 60_000L,
             manualDumpDelayMillis = 300L,
             newId = { "dump-${heapDumps.size + dumpedFiles.size}" },
+            spaceChecker = { insufficientSpace },
         )
     }
 
@@ -214,5 +219,24 @@ class HeapDumpTriggerTest {
             runScheduled()
 
             assertEquals(Event.HeapDumpFailed("disk full"), received.last())
+        }
+
+    @Test
+    fun `dump is skipped and reported when there is not enough disk space`() =
+        runTest {
+            val received = mutableListOf<Event>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                eventBus.events.collect { received += it }
+            }
+            insufficientSpace = "Not enough disk space"
+            retain(3)
+
+            trigger.onObjectRetained()
+            runScheduled()
+
+            assertTrue(heapDumps.isEmpty())
+            assertTrue(dumpedFiles.isEmpty())
+            assertTrue(received.none { it is Event.HeapDumpStarted })
+            assertEquals(Event.HeapDumpFailed("Not enough disk space"), received.last())
         }
 }

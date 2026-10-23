@@ -21,6 +21,8 @@ data class LeakWebConfig(
      * Like [watchers], a later start with another value applies it without restarting the server.
      */
     val retainedThreshold: Int = DEFAULT_RETAINED_THRESHOLD,
+    /** Shows an ongoing notification while LeakWeb is active. Disabled by default. */
+    val persistentNotification: Boolean = false,
     /**
      * What is watched automatically. Empty keeps only the web server, live memory and `LeakWeb.watch()`,
      * e.g. next to LeakCanary. Watchers turned on by a later start apply to activities created afterwards.

@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <application>
+    <application android:usesCleartextTraffic="true">
         <!-- Manual mode: turns off the automatic start so SampleApplication can call LeakWeb.start().
              MissingClass: androidx.startup comes with leakweb-android but is not on the app classpath. -->
         <provider

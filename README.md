@@ -121,6 +121,7 @@ LeakWeb only when you want to. It needs `leakweb-noop` in release builds (see ab
 | `persistToken` | `false` | Keeps the generated token across app restarts |
 | `logStartup` | `true` | Logs the URL with the token and the `adb forward` command |
 | `retainedThreshold` | `5` | Retained objects needed to dump the heap while the app is visible (1 in background) |
+| `persistentNotification` | `false` | Shows an ongoing status notification with a shortcut back to the app |
 | `watchers` | all | What is watched automatically (see [Watchers](#watchers)); empty keeps only the server and live memory |
 
 Other calls: `LeakWeb.session` returns the running session, `LeakWeb.stop()` stops the web server
@@ -131,6 +132,18 @@ watches any object that should be garbage collected soon.
 
 With `BindAddress.AllInterfaces`, logcat also shows the URL with the device IP. Anyone on the network
 who has the token can download heap dumps, so use it only on trusted networks.
+
+To opt in to the ongoing status notification, request permission from a visible Activity on Android 13+
+and enable it in the config:
+
+```kotlin
+LeakWeb.requestNotificationPermission(this)
+LeakWeb.start(application, LeakWebConfig(persistentNotification = true))
+```
+
+Call `start()` with the same config after the user grants permission if permission was requested later.
+If notification permission is denied, LeakWeb continues working and logs that the notification was
+not shown. The notification can be disabled by starting with `persistentNotification = false`.
 
 ### Watchers
 

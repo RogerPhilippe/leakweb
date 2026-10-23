@@ -30,7 +30,12 @@ internal class LeakStore(
     private val dumpsDir = File(directory, "dumps")
 
     /** File where the heap dump of a new analysis [id] must be written. */
-    fun newHeapDumpFile(id: String): File = File(dumpsDir.apply { mkdirs() }, "$id.hprof")
+    fun newHeapDumpFile(id: String): File {
+        if (!dumpsDir.isDirectory && !dumpsDir.mkdirs()) {
+            throw IOException("Could not create heap dump directory ${dumpsDir.absolutePath}")
+        }
+        return File(dumpsDir, "$id.hprof")
+    }
 
     /** Saves [analysis] and returns its leaks that were never seen in previous analyses. */
     @Synchronized

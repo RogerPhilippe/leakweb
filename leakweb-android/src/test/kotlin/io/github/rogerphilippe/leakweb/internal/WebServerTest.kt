@@ -54,7 +54,7 @@ class WebServerTest {
 
         assertEquals(
             config.serverSettings(),
-            config.copy(retainedThreshold = 1, watchers = emptySet()).serverSettings(),
+            config.copy(retainedThreshold = 1, watchers = emptySet(), persistentNotification = true).serverSettings(),
         )
         assertNotEquals(config.serverSettings(), config.copy(port = 9091).serverSettings())
     }

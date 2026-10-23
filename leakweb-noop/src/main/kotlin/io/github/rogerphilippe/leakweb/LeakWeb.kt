@@ -3,6 +3,7 @@
  */
 package io.github.rogerphilippe.leakweb
 
+import android.app.Activity
 import android.app.Application
 
 /** No-op version of LeakWeb for release builds: same API as `leakweb-android`, does nothing. */
@@ -22,4 +23,6 @@ object LeakWeb {
         obj: Any,
         description: String,
     ) = Unit
+
+    fun requestNotificationPermission(activity: Activity) = Unit
 }

@@ -4,21 +4,20 @@
 package io.github.rogerphilippe.leakweb.internal
 
 import android.app.Application
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import io.github.rogerphilippe.leakweb.LeakWebConfig
-import io.github.rogerphilippe.leakweb.analyzer.HprofAnalyzer
 import io.github.rogerphilippe.leakweb.model.Event
+import io.github.rogerphilippe.leakweb.model.HeapAnalysisFailure
 import io.github.rogerphilippe.leakweb.watcher.Clock
 import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
 import io.github.rogerphilippe.leakweb.watcher.OnObjectRetainedListener
 import io.github.rogerphilippe.leakweb.watcher.RetainedObject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -27,8 +26,8 @@ import java.util.concurrent.TimeUnit
 internal const val LEAKWEB_TAG = "LeakWeb"
 
 /**
- * Everything LeakWeb runs in the app process: watchers, heap dumps, analysis, store, events and
- * memory sampling.
+ * Watchers, heap dumps, store, events and memory sampling run in the app process. Shark analysis is
+ * delegated to [LeakWebAnalysisService].
  */
 internal class LeakWebRuntime private constructor(
     val objectWatcher: ObjectWatcher,
@@ -37,9 +36,14 @@ internal class LeakWebRuntime private constructor(
     val heapDumpTrigger: HeapDumpTrigger,
     val liveMemory: LiveMemory,
     private val watcherInstaller: WatcherInstaller,
+    private val notification: LeakWebNotification,
+    @Suppress("unused") private val analysisEventReceiver: AnalysisEventReceiver,
 ) {
     /** Applies the watcher settings of [config] (watchers, retained threshold) while the app runs. */
-    fun applyConfig(config: LeakWebConfig) = watcherInstaller.apply(config)
+    fun applyConfig(config: LeakWebConfig) {
+        watcherInstaller.apply(config)
+        notification.setEnabled(config.persistentNotification)
+    }
 
     companion object {
         /** Delay before checking if a watched object was garbage collected. */
@@ -59,20 +63,55 @@ internal class LeakWebRuntime private constructor(
                 )
             val settings = WatcherSettings(config)
             val store = LeakStore(File(application.filesDir, "leakweb"))
-            val eventBus = EventBus()
-            val analysisScope =
-                CoroutineScope(
-                    SupervisorJob() + Executors.newSingleThreadExecutor(::analysisThread).asCoroutineDispatcher(),
-                )
-            val analysisRunner =
-                HeapAnalysisRunner(analysisScope, store, eventBus) { heapDump, progressListener ->
-                    HprofAnalyzer().analyze(heapDump.file, heapDump.id, heapDump.uptimeMillis, progressListener)
+            val (eventBus, notification, analysisEventReceiver) = createEventHandling(application, config)
+            val (visibilityTracker, heapDumpTrigger) =
+                createHeapDumpTrigger(application, objectWatcher, clock, settings, store, eventBus)
+
+            objectWatcher.reportRetainedObjects(eventBus, heapDumpTrigger)
+            application.registerActivityLifecycleCallbacks(visibilityTracker)
+            val watcherInstaller =
+                WatcherInstaller(objectWatcher, settings, application::registerActivityLifecycleCallbacks).apply {
+                    apply(config)
                 }
 
+            val liveMemory = liveMemory(application, clock, objectWatcher, eventBus).apply { restore() }
+            return LeakWebRuntime(
+                objectWatcher,
+                store,
+                eventBus,
+                heapDumpTrigger,
+                liveMemory,
+                watcherInstaller,
+                notification,
+                analysisEventReceiver,
+            )
+        }
+
+        private fun createEventHandling(
+            application: Application,
+            config: LeakWebConfig,
+        ): Triple<EventBus, LeakWebNotification, AnalysisEventReceiver> {
+            val notification = LeakWebNotification(application)
+            val eventBus = EventBus(notification::onEvent)
+            val receiver = AnalysisEventReceiver(eventBus)
+            val eventFilter = IntentFilter(AnalysisEventTransport.ACTION)
+            ContextCompat.registerReceiver(application, receiver, eventFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+            notification.setEnabled(config.persistentNotification)
+            return Triple(eventBus, notification, receiver)
+        }
+
+        private fun createHeapDumpTrigger(
+            application: Application,
+            objectWatcher: ObjectWatcher,
+            clock: Clock,
+            settings: WatcherSettings,
+            store: LeakStore,
+            eventBus: EventBus,
+        ): Pair<AppVisibilityTracker, HeapDumpTrigger> {
             lateinit var visibilityTracker: AppVisibilityTracker
             val dumpThread = singleThreadScheduler("LeakWeb-heap-dump")
             val mainHandler = Handler(Looper.getMainLooper())
-            val heapDumpTrigger =
+            val trigger =
                 HeapDumpTrigger(
                     objectWatcher = objectWatcher,
                     clock = clock,
@@ -84,25 +123,49 @@ internal class LeakWebRuntime private constructor(
                         dumpThread.schedule(command, delayMillis, TimeUnit.MILLISECONDS)
                     },
                     heapDumper = AndroidHeapDumper,
+                    spaceChecker = AndroidHeapDumpSpaceChecker(application),
                     store = store,
                     eventBus = eventBus,
-                    onHeapDumped = { analysisRunner.analyze(it) },
+                    onHeapDumped = { heapDump -> enqueueAnalysis(application, heapDump, store, eventBus) },
                     visibleThreshold = { settings.retainedThreshold },
                     notifyUser = { message ->
                         mainHandler.post { Toast.makeText(application, message, Toast.LENGTH_LONG).show() }
                     },
                 )
-            visibilityTracker = AppVisibilityTracker { heapDumpTrigger.onAppVisibilityChanged() }
+            visibilityTracker = AppVisibilityTracker { trigger.onAppVisibilityChanged() }
+            return visibilityTracker to trigger
+        }
 
-            objectWatcher.reportRetainedObjects(eventBus, heapDumpTrigger)
-            application.registerActivityLifecycleCallbacks(visibilityTracker)
-            val watcherInstaller =
-                WatcherInstaller(objectWatcher, settings, application::registerActivityLifecycleCallbacks).apply {
-                    apply(config)
+        private fun enqueueAnalysis(
+            application: Application,
+            heapDump: HeapDump,
+            store: LeakStore,
+            eventBus: EventBus,
+        ) {
+            val accepted =
+                try {
+                    LeakWebAnalysisService.enqueue(application, heapDump)
+                } catch (error: IllegalStateException) {
+                    Log.e(LEAKWEB_TAG, "Could not schedule heap analysis", error)
+                    false
+                } catch (error: SecurityException) {
+                    Log.e(LEAKWEB_TAG, "Could not schedule heap analysis", error)
+                    false
                 }
-
-            val liveMemory = liveMemory(application, clock, objectWatcher, eventBus).apply { restore() }
-            return LeakWebRuntime(objectWatcher, store, eventBus, heapDumpTrigger, liveMemory, watcherInstaller)
+            if (accepted) return
+            val message = "Android did not accept the heap analysis job"
+            store.save(
+                HeapAnalysisFailure(
+                    id = heapDump.id,
+                    createdAtMillis = System.currentTimeMillis(),
+                    heapDumpFileName = heapDump.file.name,
+                    heapDumpSizeBytes = heapDump.file.length(),
+                    durationMillis = 0,
+                    errorMessage = message,
+                    stackTrace = message,
+                ),
+            )
+            eventBus.post(Event.AnalysisDone(heapDump.id, success = false))
         }
 
         private fun ObjectWatcher.reportRetainedObjects(
@@ -145,8 +208,6 @@ internal class LeakWebRuntime private constructor(
 
         private fun singleThreadScheduler(name: String): ScheduledExecutorService =
             Executors.newSingleThreadScheduledExecutor { runnable -> Thread(runnable, name).apply { isDaemon = true } }
-
-        private fun analysisThread(runnable: Runnable) = Thread(runnable, "LeakWeb-analysis").apply { isDaemon = true }
     }
 }
 

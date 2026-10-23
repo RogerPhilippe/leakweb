@@ -121,7 +121,7 @@ O usuário da lib declara só `leakweb-android` (debug) e, opcionalmente, `leakw
 - **ObjectInspector próprio** *(A)*: pelo mesmo motivo, o inspector `KEYED_WEAK_REFERENCE` do Shark não reconhece a nossa classe. Implementar um `ObjectInspector` que marque o objeto observado como **LEAKING** ("observado desde X ms, descrição Y"), senão o status do nó vazado no trace sai errado/unknown. Em vez de um campo estático mutável `heapDumpUptimeMillis` (como o LeakCanary), o uptime do dump é passado como parâmetro ao `HprofAnalyzer`, para calcular há quanto tempo o objeto está retido.
 - **Análise**: `HeapAnalyzer` do Shark com `AndroidReferenceMatchers.appDefaults` e `AndroidObjectInspectors.appDefaults` + o inspector próprio (em heaps de JVM, usados nos testes, `AndroidReferenceMatchers.ignoredReferencesOnly` e `ObjectInspectors.jdkDefaults`, pois os defaults Android leem `android.os.Build`), `computeRetainedHeapSize = true`. Converter o resultado para os modelos de `leakweb-model` (não expor tipos do Shark na API pública). Usar o `signature` que o Shark já calcula por `LeakTrace` como assinatura do vazamento.
 - **Somente processo principal**: `LeakWebInitializer` e `LeakWeb.start` verificam o nome do processo (`Application.getProcessName()` no API 28+, `/proc/self/cmdline` antes) e não fazem nada fora do processo principal — inclusive no futuro `:leakweb`. Sem isso, cada processo sobe watchers e um servidor próprio, e o fallback troca a porta silenciosamente.
-- **Processo separado** (fase posterior): mover a análise para um `Service` em `android:process=":leakweb"` para não derrubar o app em aparelhos fracos. Comunicação por arquivo + broadcast; o processo principal recarrega o `LeakStore` ao receber o broadcast.
+- **Processo separado**: a análise é executada por um `JobService` em `android:process=":leakweb"`; o `.hprof` e os JSONs do `LeakStore` são compartilhados via `filesDir`, e eventos de progresso/resultado voltam ao processo principal por broadcast privado ao pacote.
 - **Heap dump congela o app**: chamar `Debug.dumpHprofData` fora da main thread (o dump pausa todas as threads de qualquer forma, mas evita ANR por bloqueio da main antes/depois) e avisar no logcat e com Toast/notificação antes de dumpar.
 - **Permissão**: o manifest do `leakweb-android` declara `android.permission.INTERNET` (necessária para abrir o `ServerSocket`); entra no app só via `debugImplementation`.
 - **Coexistência com LeakCanary**: se `leakcanary.LeakCanary` estiver no classpath, avisar no logcat (os dois disparariam dumps). Opção de config para desligar os watchers e manter só servidor + memória ao vivo.
@@ -332,10 +332,10 @@ Cada fase termina com código compilando, testes passando e um commit/PR.
   - Sem reiniciar o servidor; watchers ligados depois valem para activities criadas a partir daí.
 
 ### Fase 7 — Robustez
-- [ ] Análise em processo separado (`:leakweb`).
-- [ ] Tratamento de pouca memória/espaço em disco (não dumpar se não houver espaço).
-- [ ] Notificação persistente opcional com status e atalho (API 33+: pedir `POST_NOTIFICATIONS`; sem permissão, cair para logcat).
-- [ ] Testes instrumentados end-to-end no `sample` (Activity vazada → vazamento registrado).
+- [x] Análise em processo separado (`:leakweb`), agendada pelo `JobScheduler` para continuar elegível em background.
+- [x] Tratamento de pouco espaço em disco: estimar o tamanho do dump antes de criá-lo, não dumpar sem espaço e reportar falhas; limpar arquivo parcial quando o dump falha.
+- [x] Notificação persistente opcional com status e atalho; `LeakWeb.requestNotificationPermission(activity)` solicita `POST_NOTIFICATIONS` no Android 13+, e a falta de permissão é reportada no logcat.
+- [x] Teste instrumentado end-to-end no `sample` (Activity destruída retida → heap analisado → vazamento listado).
 
 ### Fase 8 — Open source
 - [ ] Teste de compatibilidade de assinatura entre `leakweb-android` e `leakweb-noop` (o noop já existe desde a Fase 4).
@@ -398,4 +398,3 @@ Pontos a resolver antes de abrir o repositório:
 - **SSE manual**: ponto mais delicado do servidor; cobrir com teste de integração (conexão, recebimento, desconexão e liberação da thread, e gzip desligado).
 - **Apps multi-processo**: sem a guarda de processo principal, servidores e watchers duplicados. Ver seção 4.
 - **Coexistência com LeakCanary**: dumps duplicados se os dois estiverem instalados. Detectar e avisar; ver seção 1.1.
-

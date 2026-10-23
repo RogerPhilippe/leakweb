@@ -3,12 +3,16 @@
  */
 package io.github.rogerphilippe.leakweb.internal
 
+import android.content.Context
+import android.os.Build
 import android.os.Debug
+import android.os.storage.StorageManager
 import android.util.Log
 import io.github.rogerphilippe.leakweb.model.Event
 import io.github.rogerphilippe.leakweb.watcher.Clock
 import io.github.rogerphilippe.leakweb.watcher.ObjectWatcher
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -21,6 +25,45 @@ internal fun interface HeapDumper {
 internal object AndroidHeapDumper : HeapDumper {
     override fun dumpHeap(file: File) = Debug.dumpHprofData(file.absolutePath)
 }
+
+/** Best-effort preflight; the dump may still fail if available space changes while it is written. */
+internal fun interface HeapDumpSpaceChecker {
+    fun insufficientSpace(file: File): String?
+}
+
+internal class AndroidHeapDumpSpaceChecker(
+    private val context: Context,
+) : HeapDumpSpaceChecker {
+    override fun insufficientSpace(file: File): String? {
+        val directory = file.parentFile
+        if (directory == null || (!directory.isDirectory && !directory.mkdirs())) {
+            return "Could not create heap dump directory"
+        }
+        val runtime = Runtime.getRuntime()
+        val usedHeapBytes = runtime.totalMemory() - runtime.freeMemory()
+        val estimatedBytes = (usedHeapBytes * 1.2).toLong() + MINIMUM_HEADROOM_BYTES
+        val availableBytes =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    val storageManager = context.getSystemService(StorageManager::class.java)
+                    storageManager.getAllocatableBytes(storageManager.getUuidForPath(directory))
+                } catch (error: IOException) {
+                    return "Could not determine available disk space: ${error.message ?: error.javaClass.name}"
+                } catch (error: SecurityException) {
+                    return "Could not determine available disk space: ${error.message ?: error.javaClass.name}"
+                }
+            } else {
+                directory.usableSpace
+            }
+        return if (availableBytes < estimatedBytes) {
+            "Not enough disk space for a heap dump (need about $estimatedBytes bytes, have $availableBytes)"
+        } else {
+            null
+        }
+    }
+}
+
+private const val MINIMUM_HEADROOM_BYTES = 16L * 1024 * 1024
 
 /** Runs [command] after [delayMillis] on a background thread. */
 internal fun interface DelayedExecutor {
@@ -52,6 +95,7 @@ internal class HeapDumpTrigger(
     private val executor: DelayedExecutor,
     private val heapDumper: HeapDumper,
     private val store: LeakStore,
+    private val spaceChecker: HeapDumpSpaceChecker,
     private val eventBus: EventBus,
     private val onHeapDumped: (HeapDump) -> Unit,
     private val notifyUser: (String) -> Unit = {},
@@ -116,7 +160,13 @@ internal class HeapDumpTrigger(
         reason: String,
     ) {
         val id = newId()
-        val file = store.newHeapDumpFile(id)
+        val file = newHeapDumpFile(id) ?: return
+        val spaceError = spaceChecker.insufficientSpace(file)
+        if (spaceError != null) {
+            Log.w(LEAKWEB_TAG, spaceError)
+            eventBus.post(Event.HeapDumpFailed(spaceError))
+            return
+        }
         val message = "$reason, the app will freeze for a moment"
         Log.w(LEAKWEB_TAG, message)
         notifyUser("LeakWeb: $message")
@@ -124,17 +174,49 @@ internal class HeapDumpTrigger(
 
         val uptimeMillis = clock.uptimeMillis()
         lastDumpUptimeMillis = uptimeMillis
-        runCatching { heapDumper.dumpHeap(file) }
-            .onSuccess {
-                // The dump holds everything retained so far; stop watching it to not dump it again.
-                objectWatcher.clearObjectsWatchedBefore(uptimeMillis)
-                Log.i(LEAKWEB_TAG, "Heap dumped to ${file.absolutePath}")
-                onHeapDumped(HeapDump(id, file, uptimeMillis))
-            }.onFailure { error ->
-                file.delete()
-                Log.w(LEAKWEB_TAG, "Heap dump failed", error)
-                eventBus.post(Event.HeapDumpFailed(error.message ?: error.javaClass.name))
-            }
+        val dumpError = dumpFile(file)
+        if (dumpError != null) {
+            deletePartialDump(file)
+            reportDumpFailure(dumpError)
+            return
+        }
+        // The dump holds everything retained so far; stop watching it to not dump it again.
+        objectWatcher.clearObjectsWatchedBefore(uptimeMillis)
+        Log.i(LEAKWEB_TAG, "Heap dumped to ${file.absolutePath}")
+        onHeapDumped(HeapDump(id, file, uptimeMillis))
+    }
+
+    private fun newHeapDumpFile(id: String): File? =
+        try {
+            store.newHeapDumpFile(id)
+        } catch (error: IOException) {
+            reportDumpFailure(error)
+            null
+        }
+
+    private fun dumpFile(file: File): Exception? =
+        try {
+            heapDumper.dumpHeap(file)
+            null
+        } catch (error: IOException) {
+            error
+        } catch (error: SecurityException) {
+            error
+        } catch (error: IllegalArgumentException) {
+            error
+        } catch (error: IllegalStateException) {
+            error
+        }
+
+    private fun deletePartialDump(file: File) {
+        if (file.exists() && !file.delete()) {
+            Log.e(LEAKWEB_TAG, "Could not delete partial heap dump ${file.absolutePath}")
+        }
+    }
+
+    private fun reportDumpFailure(error: Throwable) {
+        Log.w(LEAKWEB_TAG, "Heap dump failed", error)
+        eventBus.post(Event.HeapDumpFailed(error.message ?: error.javaClass.name))
     }
 
     private companion object {

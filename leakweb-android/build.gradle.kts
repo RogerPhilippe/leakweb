@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":leakweb-watcher"))
     implementation(project(":leakweb-analyzer"))
     implementation(project(":leakweb-server"))
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.startup.runtime)
     implementation(libs.kotlinx.coroutines.core)
 

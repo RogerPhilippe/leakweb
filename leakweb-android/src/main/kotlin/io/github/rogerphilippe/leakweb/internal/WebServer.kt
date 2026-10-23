@@ -81,7 +81,11 @@ internal class RunningServer(
 
 /** [LeakWebConfig] without the watcher settings, which are applied without restarting the server. */
 internal fun LeakWebConfig.serverSettings(): LeakWebConfig =
-    copy(retainedThreshold = LeakWebConfig.DEFAULT_RETAINED_THRESHOLD, watchers = WatcherType.defaults)
+    copy(
+        retainedThreshold = LeakWebConfig.DEFAULT_RETAINED_THRESHOLD,
+        watchers = WatcherType.defaults,
+        persistentNotification = false,
+    )
 
 /** The fixed token, the persisted one, or a new random one (persisted if asked). */
 internal fun resolveToken(
